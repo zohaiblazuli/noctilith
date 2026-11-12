@@ -1,1 +1,104 @@
-<!doctype html><title>SPHEREx Time Explorer</title><canvas id="view"></canvas>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SPHEREx Time Explorer</title>
+  <meta name="description" content="Play every SPHEREx infrared image of a patch of sky as a flipbook and spot what moves or changes.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">◐</span>
+      <div>
+        <h1>SPHEREx Time Explorer</h1>
+        <p class="tag">Watch the infrared sky change. Find what moves.</p>
+      </div>
+    </div>
+    <form id="search" class="search" autocomplete="off">
+      <label>RA <input id="ra" name="ra" placeholder="150.0 or 10h00m00s" required
+        title="Right Ascension: how far east around the sky, in degrees (0–360) or hours (10h00m00s)"></label>
+      <label>Dec <input id="dec" name="dec" placeholder="+2.2 or +02:12:00" required
+        title="Declination: how far north or south of the celestial equator, in degrees (−90 to +90)"></label>
+      <label>Field
+        <select id="fov" title="How much sky to show. Bigger fields catch faster objects but load slower.">
+          <option value="0.05">0.05°</option>
+          <option value="0.1" selected>0.1°</option>
+          <option value="0.2">0.2°</option>
+          <option value="0.5">0.5°</option>
+        </select>
+      </label>
+      <button type="submit" class="primary">Go</button>
+      <select id="demo" aria-label="Try a demo spot"><option value="">Try a demo spot…</option></select>
+      <button type="button" id="share" title="Copy a link to this exact view">Share link</button>
+    </form>
+    <p id="formError" class="form-error" role="alert"></p>
+  </header>
+
+  <div id="guide" class="guide" hidden></div>
+
+  <main class="layout">
+    <section class="stage">
+      <div class="modebar">
+        <div class="seg" role="tablist" aria-label="View mode">
+          <button type="button" data-mode="play" class="on">Play</button>
+          <button type="button" data-mode="compare">Compare</button>
+        </div>
+        <div id="frameLabel" class="frame-label">Enter a position or pick a demo spot to begin.</div>
+      </div>
+
+      <div id="playView" class="view-play">
+        <canvas id="mainCanvas" class="viewer"></canvas>
+      </div>
+
+      <div id="compareView" class="view-compare" hidden>
+        <figure><figcaption id="capBefore">Before</figcaption><canvas id="cBefore" class="viewer"></canvas></figure>
+        <figure><figcaption id="capAfter">After</figcaption><canvas id="cAfter" class="viewer"></canvas></figure>
+        <figure><figcaption title="Red = brighter in 'after', blue = brighter in 'before', in units of the noise (σ)">Difference</figcaption><canvas id="cDiff" class="viewer"></canvas></figure>
+        <p id="pairNote" class="pair-note"></p>
+      </div>
+
+      <div class="controls">
+        <button type="button" id="prev" title="Previous frame (←)">⏮</button>
+        <button type="button" id="play" class="primary" title="Play / pause (space)">▶</button>
+        <button type="button" id="next" title="Next frame (→)">⏭</button>
+        <label>Speed <input type="range" id="speed" min="1" max="8" value="3"> <span id="speedVal">3</span> fps</label>
+        <label>Visit <select id="burst"></select></label>
+        <label>Detector <select id="detector">
+          <option value="all">All</option>
+          <option value="1">D1</option><option value="2">D2</option><option value="3">D3</option>
+          <option value="4">D4</option><option value="5">D5</option><option value="6">D6</option>
+        </select></label>
+        <span class="legend"><i class="dot sso"></i>known asteroid/comet <i class="dot star"></i>Gaia star <i class="dot cand"></i>candidate</span>
+      </div>
+
+      <div id="timeline" class="timeline" aria-label="Frames in time order"></div>
+      <p id="loadStatus" class="load-status"></p>
+    </section>
+
+    <aside class="panel" id="panel">
+      <h2>Clicked spot</h2>
+      <div id="spot" class="spot muted">Click anything in the image to see what it is.</div>
+      <div id="spectrumBox" class="spectrum-box" hidden>
+        <h3>Brightness vs colour <span class="muted">(all visits)</span></h3>
+        <canvas id="spectrum"></canvas>
+        <p class="hint">Each dot is one visit. SPHEREx sees each spot in a different infrared colour every time, so together they make a spectrum.</p>
+      </div>
+      <details class="about">
+        <summary>What am I looking at?</summary>
+        <p>SPHEREx is a NASA telescope that photographs the whole sky in 102 infrared colours. Each square pixel is about 6 arcseconds across. Every frame here is one SPHEREx photo of the same patch, lined up north-up. Stars and galaxies stay put; asteroids and comets drift from frame to frame.</p>
+        <p>Every frame sees a slightly different colour (shown as λ, in microns), so some brightness changes are just colour. Compare mode pairs frames of similar colour for you.</p>
+      </details>
+    </aside>
+  </main>
+
+  <footer class="credits">
+    Data: NASA/IPAC Infrared Science Archive (SPHEREx), IMCCE SkyBoT, ESA Gaia DR3. Built for NASA Space Apps.
+  </footer>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
