@@ -1,0 +1,19 @@
+# Data (large, re-downloadable)
+*.fits
+*.fits.gz
+cache/
+data/cache/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Tooling / OS
+.superpowers/
+.claude/settings.local.json
+.DS_Store
+Thumbs.db
+.env

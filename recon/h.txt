@@ -1,0 +1,9 @@
+HTTP/1.1 200 OK
+Server: nginx
+Date: Thu, 12 Nov 2026 12:24:13 GMT
+Content-Type: text/csv
+Content-Length: 5166
+Connection: keep-alive
+Server-Timing: main;dur=543.275, prepare_internal;dur=232.641, generate_adql;dur=0.128, query_delegate;dur=305.979, query_execute;dur=305.852, database_query;dur=305.819, get_postgres_connection;dur=6.011, run_postgres;dur=298.911
+Set-Cookie: anonymous=ff/97/6a89f8954eb9e0832fd878b2f66e
+
