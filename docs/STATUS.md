@@ -1,7 +1,7 @@
 # Status: last updated 2026-11-12 (Day 1)
 
 ## Phase
-Design done → **next: implementation plan**, then build.
+Design and plan done → **next: build, starting at Task 1** of `docs/superpowers/plans/2026-11-12-spherex-time-explorer.md`. The execution method is not chosen yet.
 
 ## Done
 - Research on SPHEREx and its data access (see RESEARCH.md).
@@ -10,7 +10,7 @@ Design done → **next: implementation plan**, then build.
 - Design written: `docs/superpowers/specs/2026-11-12-spherex-time-explorer-design.md`.
 
 ## Next
-1. Write the implementation plan (`docs/superpowers/plans/`).
+1. Plan written: 12 tasks, of which Tasks 1–8 and 12 are core and 9–11 are stretch.
 2. Backend: `/api/frames` → `/api/frame` with disk cache → `/api/known`.
 3. Frontend: Play mode → Compare mode → overlays → side panel.
 4. Pick and pre-cache the demo spots.
