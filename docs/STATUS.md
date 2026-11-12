@@ -1,23 +1,24 @@
 # Status: last updated 2026-11-12 (Day 1)
 
 ## Phase
-Design and plan done → **next: build, starting at Task 1** of `docs/superpowers/plans/2026-11-12-spherex-time-explorer.md`. The execution method is not chosen yet.
+Building on branch `feat/time-explorer`, following `docs/superpowers/plans/2026-11-12-spherex-time-explorer.md` (Native execution).
+Ledger of done tasks and rulings: `.superpowers/sdd/2026-11-12-spherex-time-explorer/progress.md` (git-ignored).
 
 ## Done
-- Research on SPHEREx and its data access (see RESEARCH.md).
-- Sample data pulled and rendered: `recon/sample_grid.png`, `recon/sample_flipbook.gif`, `recon/sample_layers.png`.
-- Main-screen layout agreed: A (big viewer + timeline) as the base, plus B (compare mode) and C (guide strip).
-- Design written: `docs/superpowers/specs/2026-11-12-spherex-time-explorer-design.md`.
+- Tasks 1–7: backend (SIA search, cached cutouts, SkyBoT + Gaia), Play mode, timeline, URL sync, overlays, click panel, Compare mode. Browser-verified at RA 150, Dec 2.2.
 
 ## Next
-1. Plan written: 12 tasks, of which Tasks 1–8 and 12 are core and 9–11 are stretch.
-2. Backend: `/api/frames` → `/api/frame` with disk cache → `/api/known`.
-3. Frontend: Play mode → Compare mode → overlays → side panel.
-4. Pick and pre-cache the demo spots.
-5. Stretch goals: spectrum, auto change-boxes, guide strip, Aladin background.
+1. Task 8: find demo spots (`scripts/find_demo_spots.py`) and pre-cache them (`scripts/precache.py`).
+2. Task 9 (spectrum), Task 10 (candidate boxes), Task 11 (guide strip, Aladin): stretch goals.
+3. Task 12: README, `run.ps1`, then the final whole-branch review.
+
+## Run it
+`python -m uvicorn server.app:app --port 8000`, then open http://localhost:8000/?ra=150&dec=2.2
+Tests: `python -m pytest -q` and `node --test "web/*.test.mjs"`
 
 ## Open questions for the user
 - Does the hackathon require a public URL, or is a local demo plus video enough?
 
 ## Blockers / risks
-- IRSA cutouts are slow (12–16 s each, 5 MB) and sometimes return 503. Mitigation: cache, parallel fetches, burst-at-a-time loading, pre-cached demo spots.
+- A cold cutout takes about 15 s; a 200-frame spot takes about 10 min to fully load the first time. Mitigation: disk cache plus pre-cached demo spots.
+- VizieR is unreachable from this machine, so Gaia comes from the ESA archive instead.

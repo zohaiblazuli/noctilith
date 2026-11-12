@@ -122,26 +122,32 @@ export class Viewer {
     ctx.lineWidth = 1.5 * g.dpr;
     ctx.font = `${11 * g.dpr}px system-ui, sans-serif`;
     ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+    const ring = (cx, cy, rad, color) => {
+      // dark halo underneath keeps the ring visible on top of bright stars
+      ctx.strokeStyle = "rgba(0,0,0,0.7)"; ctx.lineWidth = 3.5 * g.dpr;
+      ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = color; ctx.lineWidth = 1.6 * g.dpr;
+      ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.stroke();
+    };
     for (const s of this.overlays.stars) {
       const [cx, cy] = this.toCanvas(s.x, s.y, g);
-      ctx.strokeStyle = "rgba(110,170,255,0.8)";
-      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+      ring(cx, cy, r * 1.3, "#6eaaff");
     }
     for (const o of this.overlays.sso) {
       const [cx, cy] = this.toCanvas(o.x, o.y, g);
-      ctx.strokeStyle = "#ffa23a"; ctx.fillStyle = "#ffa23a";
-      ctx.beginPath(); ctx.arc(cx, cy, r * 1.2, 0, Math.PI * 2); ctx.stroke();
-      ctx.fillText(o.name, cx + r * 1.3, cy - r * 0.6);
+      ring(cx, cy, r * 1.5, "#ffa23a");
+      ctx.fillStyle = "#ffa23a";
+      ctx.fillText(o.name, cx + r * 1.6, cy - r * 0.6);
     }
     for (const b of this.overlays.boxes) {
       const [cx, cy] = this.toCanvas(b.x, b.y, g);
-      ctx.strokeStyle = "#ff3b5c"; ctx.fillStyle = "#ff3b5c";
+      ctx.strokeStyle = "#ff3b5c"; ctx.fillStyle = "#ff3b5c"; ctx.lineWidth = 1.8 * g.dpr;
       ctx.strokeRect(cx - r * 1.3, cy - r * 1.3, r * 2.6, r * 2.6);
       ctx.fillText("candidate", cx + r * 1.4, cy - r * 1.3);
     }
     if (this.overlays.marker) {
       const [cx, cy] = this.toCanvas(this.overlays.marker.x, this.overlays.marker.y, g);
-      ctx.strokeStyle = "#7dffb0";
+      ctx.strokeStyle = "#7dffb0"; ctx.lineWidth = 1.5 * g.dpr;
       ctx.beginPath();
       ctx.moveTo(cx - r * 2, cy); ctx.lineTo(cx - r * 0.8, cy);
       ctx.moveTo(cx + r * 0.8, cy); ctx.lineTo(cx + r * 2, cy);

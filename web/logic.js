@@ -121,3 +121,16 @@ export function nearestKnown(x, y, sso, stars, r = 2) {
   }
   return best;
 }
+
+// ---------- Task 9 ----------
+export function spectrumAt(x, y, frames, payloads) {
+  const out = [];
+  for (const f of frames) {
+    const p = payloads.get(f.id);
+    if (!p) continue;
+    const i = y * p.n + x;
+    if (p.badArr[i] || !Number.isFinite(p.img[i]) || !Number.isFinite(p.wavelength_um)) continue;
+    out.push({ um: p.wavelength_um, value: p.img[i], mjd: p.mjd });
+  }
+  return out.sort((a, b) => a.um - b.um);
+}

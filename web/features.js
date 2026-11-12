@@ -1,8 +1,8 @@
 // Overlays (known objects), click panel and Compare mode, layered on top of app.js.
 import { state, on, mainViewer, frameById, showFrame, stopPlay, syncUrl, initialMode, readyFrames } from "./app.js";
-import { ssoAt, pairFor, diffSigma, nearestKnown, PAIR_WARN_UM } from "./logic.js";
+import { ssoAt, pairFor, diffSigma, nearestKnown, PAIR_WARN_UM, spectrumAt } from "./logic.js";
 import { Viewer } from "./viewer.js";
-import { showSpot } from "./panel.js";
+import { showSpot, drawSpectrum } from "./panel.js";
 
 const $ = (id) => document.getElementById(id);
 const STAR_GMAX_SHOWN = 15;
@@ -11,11 +11,13 @@ const known = { stars: [], sso: new Map() }; // sso: burst id -> {mjdRef, objs}
 let token = 0;
 let marker = null;
 let pinnedBefore = null;
+let lastSpot = null;
 
 // ---------- known objects ----------
 on("onTargetLoaded", async () => {
   const my = ++token;
-  known.stars = []; known.sso.clear(); marker = null; pinnedBefore = null;
+  known.stars = []; known.sso.clear(); marker = null; pinnedBefore = null; lastSpot = null;
+  document.getElementById("spectrumBox").hidden = true;
   const t = state.target;
   const q = `ra=${t.ra}&dec=${t.dec}&fov=${t.fov}`;
   fetch(`/api/known/stars?${q}`).then((r) => r.json()).then((s) => {
@@ -134,6 +136,8 @@ function onClick(frameId) {
       x, y, ra, dec, value: pl.img[i], bad: !!pl.badArr[i], known: k,
       frameLabel: `${f.iso.slice(0, 16).replace("T", " ")} · λ ${pl.wavelength_um.toFixed(2)} µm`,
     });
+    lastSpot = { x, y };
+    drawSpectrum(spectrumAt(x, y, state.frames, state.payloads));
     document.dispatchEvent(new CustomEvent("tool:spot", { detail: { x, y } }));
     refresh();
   };

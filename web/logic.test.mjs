@@ -2,8 +2,17 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   parseRA, parseDec, stretch, orderLoad, decodeF32, wavelengthColor,
-  ssoAt, pairFor, diffSigma, nearestKnown,
+  ssoAt, pairFor, diffSigma, nearestKnown, spectrumAt,
 } from "./logic.js";
+
+test("spectrumAt skips bad pixels and sorts by wavelength", () => {
+  const frames = [{ id: "a" }, { id: "b" }, { id: "c" }];
+  const mk = (um, v, bad) => ({ n: 2, wavelength_um: um, mjd: 1, img: new Float32Array([v, 0, 0, 0]), badArr: new Uint8Array([bad, 0, 0, 0]) });
+  const payloads = new Map([["a", mk(2.0, 5, 0)], ["b", mk(1.0, 3, 0)], ["c", mk(1.5, 9, 1)]]);
+  const s = spectrumAt(0, 0, frames, payloads);
+  assert.deepEqual(s.map((p) => p.um), [1.0, 2.0]);
+  assert.deepEqual(s.map((p) => p.value), [3, 5]);
+});
 
 test("ssoAt moves linearly", () => {
   const o = { x: 5, y: 5, dx_per_hr: 10, dy_per_hr: -2 };
