@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+httpx
+astropy
+reproject
+numpy
+scipy
+pytest
