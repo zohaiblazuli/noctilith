@@ -17,6 +17,13 @@ GAIA_TAP = "https://gea.esac.esa.int/tap-server/tap/sync"  # ESA Gaia archive (V
 MJD_TO_JD = 2400000.5
 
 
+def _num(s: str):
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
 def parse_skybot_text(text: str) -> list[dict]:
     out = []
     for line in text.splitlines():
@@ -33,9 +40,9 @@ def parse_skybot_text(text: str) -> list[dict]:
             "cls": c[4],
             "ra": 15 * (h + m / 60 + s / 3600),
             "dec": sign * (abs(float(d)) + float(dm) / 60 + float(ds) / 3600),
-            "vmag": float(c[5]),
-            "dra": float(c[8]),   # arcsec/hr, already multiplied by cos(dec) (SkyBoT convention)
-            "ddec": float(c[9]),
+            "vmag": _num(c[5]),   # missing for some comets
+            "dra": _num(c[8]) or 0.0,   # arcsec/hr, already multiplied by cos(dec) (SkyBoT convention)
+            "ddec": _num(c[9]) or 0.0,
         })
     return out
 

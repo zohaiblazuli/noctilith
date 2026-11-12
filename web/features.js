@@ -1,11 +1,14 @@
 // Overlays (known objects), click panel and Compare mode, layered on top of app.js.
 import { state, on, mainViewer, frameById, showFrame, stopPlay, syncUrl, initialMode, readyFrames } from "./app.js";
-import { ssoAt, pairFor, diffSigma, nearestKnown, PAIR_WARN_UM, spectrumAt } from "./logic.js";
+import { ssoAt, pairFor, diffSigma, nearestKnown, PAIR_WARN_UM, spectrumAt, findChanges, isAppearance, isPointLike } from "./logic.js";
 import { Viewer } from "./viewer.js";
 import { showSpot, drawSpectrum } from "./panel.js";
 
 const $ = (id) => document.getElementById(id);
 const STAR_GMAX_SHOWN = 15;
+const MAX_BOXES = 8;
+const EPOCH_GAP_D = 0.5;
+const epochOf = new Map(); // frame id -> epoch index
 
 const known = { stars: [], sso: new Map() }; // sso: burst id -> {mjdRef, objs}
 let token = 0;
@@ -24,18 +27,28 @@ on("onTargetLoaded", async () => {
     if (my !== token) return;
     known.stars = s; refresh();
   }).catch(() => {});
-  for (const b of state.bursts) {
-    const fs = state.frames.filter((f) => f.burst === b.id);
-    const mjdRef = fs.reduce((a, f) => a + f.mjd, 0) / fs.length;
+  // One SkyBoT lookup per "epoch": frames less than EPOCH_GAP_D apart. Visits can span 10 days,
+  // and straight-line extrapolation of asteroid motion is only good for about a day.
+  epochOf.clear();
+  let epoch = -1, prev = -Infinity, members = [];
+  const flush = () => {
+    if (!members.length) return;
+    const mjdRef = members.reduce((a, f) => a + f.mjd, 0) / members.length;
+    const e = epoch;
     fetch(`/api/known/sso?${q}&mjd=${mjdRef.toFixed(4)}`).then((r) => r.json()).then((objs) => {
       if (my !== token) return;
-      known.sso.set(b.id, { mjdRef, objs }); refresh();
+      known.sso.set(e, { mjdRef, objs }); refresh();
     }).catch(() => {});
+  };
+  for (const f of [...state.frames].sort((a, b) => a.mjd - b.mjd)) {
+    if (f.mjd - prev > EPOCH_GAP_D) { flush(); epoch++; members = []; }
+    members.push(f); epochOf.set(f.id, epoch); prev = f.mjd;
   }
+  flush();
 });
 
 function ssoFor(frame, mjd) {
-  const k = known.sso.get(frame.burst);
+  const k = known.sso.get(epochOf.get(frame.id));
   if (!k) return [];
   const n = state.target.n;
   return k.objs.map((o) => ({ ...o, ...ssoAt(o, k.mjdRef, mjd) }))
@@ -81,8 +94,18 @@ function renderCompare() {
   vBefore.setGray(before.img, before.badArr, before.n, before.scale.lo, before.scale.hi);
   vBefore.setOverlays(overlaysFor(pair.before));
   $("capBefore").textContent = `Before · ${fb.iso.slice(0, 16).replace("T", " ")} · λ ${before.wavelength_um.toFixed(2)} µm`;
-  vDiff.setDiverging(diffSigma(after.img, before.img, after.sig, before.sig, after.badArr, before.badArr), after.n, 5);
-  vDiff.setOverlays({ sso: ssoFor(fa, after.mjd), marker });
+  const diff = diffSigma(after.img, before.img, after.sig, before.sig, after.badArr, before.badArr);
+  vDiff.setDiverging(diff, after.n, 5);
+  // Candidate boxes: significant changes not explained by a known object in either frame.
+  // Skipped when colours differ a lot, since then most "changes" are colour, not real.
+  const knownHere = [...ssoFor(fa, after.mjd), ...ssoFor(fb, before.mjd)];
+  const boxes = pair.warn ? [] : findChanges(diff, after.n)
+    .filter((c) => !nearestKnown(c.x, c.y, knownHere, known.stars, 2.5))
+    .filter((c) => isAppearance(c, after.n, after.img, after.sig, before.img, before.sig))
+    .filter((c) => isPointLike(c))
+    .sort((a, b) => Math.abs(b.peak) - Math.abs(a.peak)).slice(0, MAX_BOXES);
+  vDiff.setOverlays({ sso: ssoFor(fa, after.mjd), boxes, marker });
+  vAfter.setOverlays({ ...overlaysFor(id), boxes });
   $(`timeline`).querySelector(`[data-id="${CSS.escape(pair.before)}"]`)?.classList.add("before");
   const hours = Math.abs(after.mjd - before.mjd) * 24;
   const gap = hours < 48 ? `${hours.toFixed(1)} hours` : `${(hours / 24).toFixed(0)} days`;

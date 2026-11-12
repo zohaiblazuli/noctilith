@@ -1,1 +1,22 @@
-[]
+[
+  {
+    "label": "Asteroid Abundantia racing across (Jan 2026)",
+    "ra": 18.73382, "dec": 8.39662, "fov": 0.2, "mjd": 61045.832,
+    "note": "A bright main-belt asteroid crosses this field in about 10 hours. Press play on the Jan 2026 visit."
+  },
+  {
+    "label": "Asteroid Menzel on the move (Jan 2026)",
+    "ra": 18.04108, "dec": 6.95197, "fov": 0.1, "mjd": 61045.832,
+    "note": "An inner main-belt asteroid drifts about 30 pixels in 3 hours."
+  },
+  {
+    "label": "Slow asteroid De Sitter (Aug–Sep 2025)",
+    "ra": 17.93504, "dec": 7.54516, "fov": 0.1, "mjd": 60903.938,
+    "note": "This asteroid is near its turning point, so it creeps slowly through 32 frames over two weeks."
+  },
+  {
+    "label": "Quiet deep field (COSMOS)",
+    "ra": 150.0, "dec": 2.2, "fov": 0.1,
+    "note": "A famous deep-survey field with about 200 SPHEREx frames. Good for spectra and for seeing what 'nothing changed' looks like."
+  }
+]

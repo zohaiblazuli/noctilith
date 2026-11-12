@@ -38,6 +38,7 @@ function setError(msg) { $("formError").textContent = msg || ""; }
 
 // ---------- URL ----------
 function syncUrl() {
+  if (!state.target) return; // keep the incoming URL until a target has loaded
   const p = new URLSearchParams();
   if (state.target) {
     p.set("ra", String(+state.target.ra.toFixed(5)));
@@ -51,8 +52,9 @@ function syncUrl() {
 export { syncUrl };
 
 // ---------- loading ----------
-async function loadTarget(ra, dec, fov, wantFrame = null) {
+async function loadTarget(ra, dec, fov, wantFrame = null, focusMjd = null) {
   const token = ++state.token;
+  if (focusMjd === null) delete $("loadStatus").dataset.note;
   stopPlay();
   Object.assign(state, { frames: [], bursts: [], current: null });
   state.payloads.clear(); state.status.clear();
@@ -89,7 +91,16 @@ async function loadTarget(ra, dec, fov, wantFrame = null) {
   emit("onTargetLoaded");
   mainViewer.setMessage(`Found ${state.frames.length} images. Loading the newest visit first…`);
 
-  const order = orderLoad(state.frames, state.bursts);
+  let order = orderLoad(state.frames, state.bursts);
+  if (focusMjd !== null && !wantFrame) {
+    // demo spots: load the visit nearest focusMjd first and open on it
+    const near = state.frames.reduce((a, f) => (Math.abs(f.mjd - focusMjd) < Math.abs(a.mjd - focusMjd) ? f : a));
+    const first = order.filter((id) => frameById(id).burst === near.burst)
+      .sort((a, b) => Math.abs(frameById(a).mjd - focusMjd) - Math.abs(frameById(b).mjd - focusMjd));
+    order = [...first, ...order.filter((id) => !first.includes(id))];
+    wantFrame = first[0];
+    $("burst").value = String(near.burst);
+  }
   if (wantFrame && order.includes(wantFrame)) order.unshift(...order.splice(order.indexOf(wantFrame), 1));
   order.forEach((id) => state.status.set(id, "loading"));
   updateLoadStatus();
@@ -130,7 +141,8 @@ function updateLoadStatus() {
   if (c.loading) parts.push(`${c.loading} loading (each takes ~15 s from NASA the first time)`);
   if (c.failed) parts.push(`${c.failed} failed (click a grey tile to retry)`);
   if (c.empty) parts.push(`${c.empty} only clip the edge of this spot`);
-  $("loadStatus").textContent = parts.join(" · ");
+  const note = $("loadStatus").dataset.note;
+  $("loadStatus").textContent = (note ? note + " · " : "") + parts.join(" · ");
 }
 
 // ---------- timeline ----------
@@ -289,8 +301,9 @@ fetch("demo-spots.json").then((r) => r.json()).then((spots) => {
     const s = spots[+sel.value];
     if (!s) return;
     $("ra").value = s.ra; $("dec").value = s.dec; $("fov").value = String(s.fov);
-    loadTarget(s.ra, s.dec, s.fov);
+    loadTarget(s.ra, s.dec, s.fov, null, s.mjd ?? null);
     sel.value = "";
+    if (s.note) $("loadStatus").dataset.note = s.note;
   });
 }).catch(() => {});
 

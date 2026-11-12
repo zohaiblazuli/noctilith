@@ -2,8 +2,44 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   parseRA, parseDec, stretch, orderLoad, decodeF32, wavelengthColor,
-  ssoAt, pairFor, diffSigma, nearestKnown, spectrumAt,
+  ssoAt, pairFor, diffSigma, nearestKnown, spectrumAt, findChanges, isAppearance, isPointLike,
 } from "./logic.js";
+
+test("isPointLike rejects tiny sharp spikes (cosmic rays)", () => {
+  assert.equal(isPointLike({ pixels: 2, peak: 8 }), false);
+  assert.equal(isPointLike({ pixels: 3, peak: 40 }), false);
+  assert.equal(isPointLike({ pixels: 3, peak: 9 }), true);
+  assert.equal(isPointLike({ pixels: 6, peak: -60 }), true);
+});
+
+test("isAppearance: present in one frame only", () => {
+  const n = 5, one = new Float32Array(n * n).fill(1);
+  const a = new Float32Array(n * n), b = new Float32Array(n * n);
+  a[2 * n + 2] = 10;                                  // new source in "after"
+  assert.equal(isAppearance({ x: 2, y: 2, peak: 8 }, n, a, one, b, one), true);
+  b[2 * n + 3] = 10;                                  // a static source next door in "before" too
+  assert.equal(isAppearance({ x: 2, y: 2, peak: 8 }, n, a, one, b, one), false);
+  // negative change: was there before, gone now
+  const a2 = new Float32Array(n * n), b2 = new Float32Array(n * n); b2[0] = 10;
+  assert.equal(isAppearance({ x: 0, y: 0, peak: -8 }, n, a2, one, b2, one), true);
+});
+
+test("findChanges boxes a 2-pixel blob but not a single spike", () => {
+  const n = 10, d = new Float32Array(n * n);
+  d[3 * n + 4] = 8; d[3 * n + 5] = 7;   // blob at y=3, x=4..5
+  d[8 * n + 8] = 50;                     // lone spike (cosmic-ray-like)
+  const out = findChanges(d, n);
+  assert.equal(out.length, 1);
+  near(out[0].x, 4.5); near(out[0].y, 3); assert.equal(out[0].peak, 8);
+});
+
+test("findChanges treats negative blobs too and ignores NaN", () => {
+  const n = 6, d = new Float32Array(n * n).fill(NaN);
+  d[0] = -9; d[1] = -6;
+  const out = findChanges(d, n);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].peak, -9);
+});
 
 test("spectrumAt skips bad pixels and sorts by wavelength", () => {
   const frames = [{ id: "a" }, { id: "b" }, { id: "c" }];

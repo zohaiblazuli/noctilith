@@ -27,6 +27,14 @@ def test_parse_skybot_fixture():
     assert o["dra"] == pytest.approx(54.641)
 
 
+def test_parse_skybot_missing_vmag():
+    line = " - | C/2025 X1 | 10 00 02.0 | +02 12 55.6 | Comet |  | 0.1 | 60.0 | 12.0 | -3.0 | 1.2 | 1.5 \n"
+    objs = parse_skybot_text(line)
+    assert len(objs) == 1
+    assert objs[0]["vmag"] is None
+    assert objs[0]["dra"] == 12.0
+
+
 def test_parse_skybot_empty():
     assert parse_skybot_text("# Flag: 0\n# Ticket: 1\n") == []
 

@@ -134,3 +134,53 @@ export function spectrumAt(x, y, frames, payloads) {
   }
   return out.sort((a, b) => a.um - b.um);
 }
+
+// ---------- Task 10 ----------
+// Connected groups (4-neighbour) of pixels with |σ| > thresh and at least minPix pixels.
+export function findChanges(diff, n, thresh = 5, minPix = 2) {
+  const seen = new Uint8Array(n * n);
+  const out = [];
+  for (let i = 0; i < n * n; i++) {
+    if (seen[i] || !(Math.abs(diff[i]) > thresh)) continue;
+    const sign = Math.sign(diff[i]);
+    const stack = [i];
+    seen[i] = 1;
+    let sx = 0, sy = 0, count = 0, peak = 0;
+    while (stack.length) {
+      const j = stack.pop();
+      const x = j % n, y = (j / n) | 0;
+      sx += x; sy += y; count++;
+      if (Math.abs(diff[j]) > Math.abs(peak)) peak = diff[j];
+      for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+        if (nx < 0 || ny < 0 || nx >= n || ny >= n) continue;
+        const k = ny * n + nx;
+        if (!seen[k] && Math.abs(diff[k]) > thresh && Math.sign(diff[k]) === sign) { seen[k] = 1; stack.push(k); }
+      }
+    }
+    if (count >= minPix) out.push({ x: sx / count, y: sy / count, peak, pixels: count });
+  }
+  return out;
+}
+
+// A change is a candidate only if the source is clearly in one frame and absent (≤ absentSigma
+// anywhere in the 3×3 neighbourhood) in the other. Static stars that merely subtract imperfectly
+// (blur differs between visits) are present in both and get rejected.
+export function isAppearance(c, n, a, sa, b, sb, presentSigma = 5, absentSigma = 3) {
+  const [hasIn, missIn, sHas, sMiss] = c.peak > 0 ? [a, b, sa, sb] : [b, a, sb, sa];
+  const x0 = Math.round(c.x), y0 = Math.round(c.y);
+  let present = false, other = -Infinity;
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    const x = x0 + dx, y = y0 + dy;
+    if (x < 0 || y < 0 || x >= n || y >= n) continue;
+    const i = y * n + x;
+    if (sHas[i] > 0 && hasIn[i] / sHas[i] > presentSigma) present = true;
+    if (sMiss[i] > 0 && Number.isFinite(missIn[i])) other = Math.max(other, missIn[i] / sMiss[i]);
+  }
+  return present && other <= absentSigma;
+}
+
+// Real sources are blurred by the telescope over several pixels; cosmic rays / hot pixels stay
+// sharp even after reprojection spreads them over 2–3 grid pixels. Tuned on RA 150 Dec 2.2.
+export function isPointLike(c, sharpPeak = 15) {
+  return c.pixels >= 3 && !(Math.abs(c.peak) > sharpPeak && c.pixels < 5);
+}
