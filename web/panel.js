@@ -1,4 +1,5 @@
 // Side panel: details of the clicked spot.
+import { esc } from "./logic.js";
 const $ = (id) => document.getElementById(id);
 
 const fmtDeg = (v, d = 5) => v.toFixed(d) + "°";
@@ -8,9 +9,9 @@ export function showSpot({ x, y, ra, dec, value, bad, known, frameLabel }) {
   if (bad) {
     verdict = `<div class="verdict">This pixel is <b>flagged</b> in this frame (a detector glitch, cosmic ray or saturated star). Its value can't be trusted. Try another frame.</div>`;
   } else if (known && known.name) {
-    verdict = `<div class="verdict known"><b>Known:</b> ${known.name}<br><span class="muted">${known.cls || "solar-system object"}${known.vmag ? ` · V ≈ ${known.vmag}` : ""}</span><br>It's a catalogued asteroid or comet, already in the books.</div>`;
+    verdict = `<div class="verdict known"><b>Known:</b> ${esc(known.name)}<br><span class="muted">${esc(known.cls || "solar-system object")}${known.vmag ? ` · V ≈ ${esc(known.vmag)}` : ""}</span><br>It's a catalogued asteroid or comet, already in the books.</div>`;
   } else if (known) {
-    verdict = `<div class="verdict star"><b>Gaia star</b> · G = ${known.gmag.toFixed(1)}<br><span class="muted">Gaia DR3 ${known.source_id}</span></div>`;
+    verdict = `<div class="verdict star"><b>Gaia star</b> · G = ${esc(Number(known.gmag).toFixed(1))}<br><span class="muted">Gaia DR3 ${esc(known.source_id)}</span></div>`;
   } else {
     verdict = `<div class="verdict cand"><b>Not in Gaia or the known-asteroid lists</b>, so it's a <b>candidate</b>. Before getting excited, check that it shows up in more than one frame and isn't flagged. Many candidates are faint galaxies or noise.</div>`;
   }
@@ -21,7 +22,7 @@ export function showSpot({ x, y, ra, dec, value, bad, known, frameLabel }) {
       <dt>Dec</dt><dd>${dec >= 0 ? "+" : ""}${fmtDeg(dec)}</dd>
       <dt>Pixel</dt><dd>${x}, ${y}</dd>
       <dt>Brightness</dt><dd>${Number.isFinite(value) ? value.toFixed(3) + " MJy/sr" : "n/a"} <span class="muted">(above background)</span></dd>
-      <dt>Frame</dt><dd>${frameLabel}</dd>
+      <dt>Frame</dt><dd>${esc(frameLabel)}</dd>
     </dl>${verdict}`;
 }
 

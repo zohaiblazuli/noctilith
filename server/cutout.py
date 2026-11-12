@@ -22,8 +22,8 @@ log = logging.getLogger(__name__)
 BAD_BITS = (0, 1, 2, 4, 5, 6, 9, 10, 11, 15, 17, 19)
 BAD_MASK = sum(1 << b for b in BAD_BITS)
 MIN_COVERAGE = 0.5
-BACKOFF_S = (2, 4, 8, 8)
-TIMEOUT_S = 60
+BACKOFF_S = (2, 4)  # 3 attempts: a dead IRSA greys a tile in ~1 min, not ~5
+TIMEOUT_S = 25
 CUTOUT_MARGIN = 1.5  # cutout bigger than fov so rotated frames still fill the grid
 
 

@@ -184,3 +184,16 @@ export function isAppearance(c, n, a, sa, b, sb, presentSigma = 5, absentSigma =
 export function isPointLike(c, sharpPeak = 15) {
   return c.pixels >= 3 && !(Math.abs(c.peak) > sharpPeak && c.pixels < 5);
 }
+
+// ---------- review fixes ----------
+export function esc(v) {
+  return String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// Message for the viewer once loading has finished, or null if at least one frame is usable.
+export function endOfLoadMessage({ ready, empty, failed }) {
+  if (ready > 0) return null;
+  if (failed > 0) return "NASA's archive isn't answering right now. Click a grey tile to retry, or try a demo spot.";
+  if (empty > 0) return "SPHEREx only clipped the edge of this spot, so there are no usable images yet. Try a nearby position.";
+  return "No SPHEREx images cover this spot yet. Try a demo spot.";
+}

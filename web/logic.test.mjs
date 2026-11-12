@@ -3,7 +3,21 @@ import assert from "node:assert/strict";
 import {
   parseRA, parseDec, stretch, orderLoad, decodeF32, wavelengthColor,
   ssoAt, pairFor, diffSigma, nearestKnown, spectrumAt, findChanges, isAppearance, isPointLike,
+  esc, endOfLoadMessage,
 } from "./logic.js";
+
+test("esc neutralises HTML", () => {
+  assert.equal(esc('<img src=x onerror="a">&'), "&lt;img src=x onerror=&quot;a&quot;&gt;&amp;");
+  assert.equal(esc(null), "");
+  assert.equal(esc(14.3), "14.3");
+});
+
+test("endOfLoadMessage only when nothing is usable", () => {
+  assert.equal(endOfLoadMessage({ ready: 3, empty: 1, failed: 0 }), null);
+  assert.match(endOfLoadMessage({ ready: 0, empty: 5, failed: 0 }), /edge/);
+  assert.match(endOfLoadMessage({ ready: 0, empty: 0, failed: 5 }), /NASA/);
+  assert.match(endOfLoadMessage({ ready: 0, empty: 2, failed: 3 }), /NASA/);
+});
 
 test("isPointLike rejects tiny sharp spikes (cosmic rays)", () => {
   assert.equal(isPointLike({ pixels: 2, peak: 8 }), false);

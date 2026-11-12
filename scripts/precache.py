@@ -14,17 +14,14 @@ sys.path.insert(0, str(ROOT))
 from server.config import SETTINGS  # noqa: E402
 from server.cutout import CutoutError, get_frame  # noqa: E402
 from server.known import known_sso, known_stars  # noqa: E402
-from server.sia import assign_bursts, query_frames  # noqa: E402
+from server.sia import cached_query_frames, epochs  # noqa: E402
 
 
 async def warm(c, sem, spot):
     ra, dec, fov = spot["ra"], spot["dec"], spot["fov"]
-    frames = await query_frames(c, ra, dec, fov)
-    bursts = assign_bursts(frames)
+    frames = await cached_query_frames(c, ra, dec, fov)
     await known_stars(c, ra, dec, fov)
-    for b in bursts:
-        fs = [f for f in frames if f.burst == b["id"]]
-        mjd = sum(f.mjd for f in fs) / len(fs)
+    for mjd in epochs(frames):  # same grouping and rounding as web/features.js
         await known_sso(c, ra, dec, fov, float(f"{mjd:.4f}"))
     ok = empty = failed = 0
 

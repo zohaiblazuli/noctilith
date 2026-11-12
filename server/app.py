@@ -11,7 +11,7 @@ from server.config import SETTINGS
 from server.cutout import CutoutError, get_frame
 from server.grid import make_grid_wcs
 from server.known import known_sso, known_stars
-from server.sia import assign_bursts, query_frames
+from server.sia import assign_bursts, cached_query_frames as query_frames
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 

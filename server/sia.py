@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 import httpx
 from astropy.time import Time
 
+from server import cache
 from server.config import SETTINGS
 
 SIA_URL = "https://irsa.ipac.caltech.edu/SIA"
@@ -74,3 +75,29 @@ async def query_frames(client: httpx.AsyncClient, ra: float, dec: float, fov: fl
     r = await client.get(SIA_URL, params=params, timeout=60)
     r.raise_for_status()
     return parse_sia_csv(r.text)
+
+
+def epochs(frames: list[FrameMeta], gap_days: float = 0.5) -> list[float]:
+    """Mean MJD of each group of frames less than gap_days apart (must match web/features.js)."""
+    out, group, prev = [], [], None
+    for f in sorted(frames, key=lambda f: f.mjd):
+        if prev is not None and f.mjd - prev > gap_days:
+            out.append(sum(g.mjd for g in group) / len(group)); group = []
+        group.append(f); prev = f.mjd
+    if group:
+        out.append(sum(g.mjd for g in group) / len(group))
+    return out
+
+
+async def cached_query_frames(client: httpx.AsyncClient, ra: float, dec: float, fov: float) -> list[FrameMeta]:
+    """Live SIA query (so new releases appear); falls back to the last good answer if IRSA is down."""
+    k = cache.key("sia-v1", SETTINGS.collection, round(ra, 5), round(dec, 5))
+    try:
+        frames = await query_frames(client, ra, dec, fov)
+    except httpx.HTTPError:
+        hit = cache.get_json(k)
+        if hit is None:
+            raise
+        return [FrameMeta(**{**d, "band_um": tuple(d["band_um"])}) for d in hit]
+    cache.put_json(k, [{kk: v for kk, v in f.to_dict().items() if kk != "id"} for f in frames])
+    return frames

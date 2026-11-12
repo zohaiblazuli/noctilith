@@ -1,24 +1,26 @@
 # Status: last updated 2026-11-12 (Day 1)
 
 ## Phase
-Building on branch `feat/time-explorer`, following `docs/superpowers/plans/2026-11-12-spherex-time-explorer.md` (Native execution).
-Ledger of done tasks and rulings: `.superpowers/sdd/2026-11-12-spherex-time-explorer/progress.md` (git-ignored).
+All plan tasks built on branch `feat/time-explorer` (not merged). **Next: act on the final whole-branch review**, then merge.
+Ledger with every ruling: `.superpowers/sdd/2026-11-12-spherex-time-explorer/progress.md` (git-ignored).
 
 ## Done
-- Tasks 1–7: backend (SIA search, cached cutouts, SkyBoT + Gaia), Play mode, timeline, URL sync, overlays, click panel, Compare mode. Browser-verified at RA 150, Dec 2.2.
+- Backend: SIA search, cached and reprojected cutouts (6 parallel requests, retries), SkyBoT and Gaia (ESA archive).
+- Page: Play mode, timeline, URL sync, overlays, click panel, spectrum, Compare mode with candidate boxes, guide strip, demo spots.
+- README, `run.ps1`. Tests: 31 pytest, 17 node.
 
 ## Next
-1. Task 8: find demo spots (`scripts/find_demo_spots.py`) and pre-cache them (`scripts/precache.py`).
-2. Task 9 (spectrum), Task 10 (candidate boxes), Task 11 (guide strip, Aladin): stretch goals.
-3. Task 12: README, `run.ps1`, then the final whole-branch review.
+1. Fix Critical/Important review findings (TDD), then merge to `main`.
+2. Make sure `python scripts/precache.py` has finished for all 4 demo spots before demoing.
+3. Optional: Aladin background (CDS is unreachable from this machine), public hosting.
 
 ## Run it
-`python -m uvicorn server.app:app --port 8000`, then open http://localhost:8000/?ra=150&dec=2.2
+`python -m uvicorn server.app:app --port 8000` (or `./run.ps1`), then open http://localhost:8000
 Tests: `python -m pytest -q` and `node --test "web/*.test.mjs"`
 
 ## Open questions for the user
 - Does the hackathon require a public URL, or is a local demo plus video enough?
 
 ## Blockers / risks
-- A cold cutout takes about 15 s; a 200-frame spot takes about 10 min to fully load the first time. Mitigation: disk cache plus pre-cached demo spots.
-- VizieR is unreachable from this machine, so Gaia comes from the ESA archive instead.
+- A cold cutout takes about 15 s, so a new spot takes several minutes to fully load. Demo spots must be pre-cached.
+- VizieR and Aladin (CDS) are unreachable from this machine; Gaia comes from the ESA archive.

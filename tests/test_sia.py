@@ -53,3 +53,36 @@ def test_query_url():
     assert q["POS"] == "circle 150.0 2.2 0.001"
     assert q["RESPONSEFORMAT"] == "CSV"
     assert len(frames) == 5
+
+
+def test_epochs_group_close_frames():
+    from server.sia import epochs
+    frames = [_meta(m) for m in [0.0, 0.1, 0.2, 2.0, 2.1]]
+    assert epochs(frames) == [pytest.approx(0.1), pytest.approx(2.05)]
+
+
+def test_cached_query_falls_back_when_irsa_down(tmp_path, monkeypatch):
+    from server import sia
+    monkeypatch.setattr(sia.cache.SETTINGS, "cache_dir", tmp_path)
+    text = (FIX / "sia_sample.csv").read_text()
+    ok = httpx.MockTransport(lambda r: httpx.Response(200, text=text))
+    down = httpx.MockTransport(lambda r: httpx.Response(503))
+
+    async def run(transport):
+        async with httpx.AsyncClient(transport=transport) as c:
+            return await sia.cached_query_frames(c, 150.0, 2.2, 0.1)
+
+    assert len(asyncio.run(run(ok))) == 5
+    assert len(asyncio.run(run(down))) == 5   # served from disk
+
+
+def test_cached_query_raises_when_down_and_uncached(tmp_path, monkeypatch):
+    from server import sia
+    monkeypatch.setattr(sia.cache.SETTINGS, "cache_dir", tmp_path)
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(503))) as c:
+            return await sia.cached_query_frames(c, 1.0, 2.0, 0.1)
+
+    with pytest.raises(httpx.HTTPError):
+        asyncio.run(run())

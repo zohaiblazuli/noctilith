@@ -1,8 +1,9 @@
-import { parseRA, parseDec, decodeF32, decodeU8, stretch, wavelengthColor, orderLoad } from "./logic.js";
+import { parseRA, parseDec, decodeF32, decodeU8, stretch, wavelengthColor, orderLoad, endOfLoadMessage } from "./logic.js";
 import { Viewer } from "./viewer.js";
 
 const $ = (id) => document.getElementById(id);
 const LOAD_CONCURRENCY = 6;
+let abortCtl = new AbortController();
 
 export const state = {
   target: null,        // {ra, dec, fov, n}
@@ -54,6 +55,8 @@ export { syncUrl };
 // ---------- loading ----------
 async function loadTarget(ra, dec, fov, wantFrame = null, focusMjd = null) {
   const token = ++state.token;
+  abortCtl.abort();               // cancel the previous spot's in-flight downloads
+  abortCtl = new AbortController();
   if (focusMjd === null) delete $("loadStatus").dataset.note;
   stopPlay();
   Object.assign(state, { frames: [], bursts: [], current: null });
@@ -109,13 +112,19 @@ async function loadTarget(ra, dec, fov, wantFrame = null, focusMjd = null) {
     while (queue.length && token === state.token) await loadFrame(queue.shift(), token, wantFrame);
   };
   await Promise.all(Array.from({ length: LOAD_CONCURRENCY }, worker));
+  if (token !== state.token) return;
+  const c = { ready: 0, empty: 0, failed: 0 };
+  state.status.forEach((s) => { if (s in c) c[s]++; });
+  const msg = endOfLoadMessage(c);
+  if (msg) mainViewer.setMessage(msg);
 }
 
 async function loadFrame(id, token, wantFrame) {
   const t = state.target;
   setTile(id, "loading");
   try {
-    const r = await fetch(`/api/frame?id=${encodeURIComponent(id)}&ra=${t.ra}&dec=${t.dec}&fov=${t.fov}`);
+    const r = await fetch(`/api/frame?id=${encodeURIComponent(id)}&ra=${t.ra}&dec=${t.dec}&fov=${t.fov}`,
+      { signal: abortCtl.signal });
     if (token !== state.token) return;
     if (r.status === 404) { state.status.set(id, "empty"); setTile(id, "empty"); return; }
     if (!r.ok) throw new Error(r.statusText);

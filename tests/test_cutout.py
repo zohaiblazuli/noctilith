@@ -89,3 +89,16 @@ def test_cutout_url_has_margin():
     asyncio.run(run())
     assert "center=150.0,2.2" in seen["url"]
     assert "size=0.15deg" in seen["url"]
+
+
+def test_retry_budget_is_short():
+    client, calls = _client([httpx.Response(503)])
+
+    async def run():
+        async with client:
+            await fetch_cutout(client, "https://x/f.fits", 150, 2.2, 0.1, asyncio.Semaphore(6))
+
+    with pytest.raises(CutoutError):
+        asyncio.run(run())
+    assert calls["n"] == 3
+    assert cutout.TIMEOUT_S <= 25
