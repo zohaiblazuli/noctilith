@@ -78,3 +78,46 @@ export function orderLoad(frames, bursts) {
   }
   return out;
 }
+
+// ---------- Task 7 ----------
+const HOUR = 1 / 24;
+export const PAIR_WARN_UM = 0.03;
+
+export function ssoAt(obj, mjdRef, mjd) {
+  const h = (mjd - mjdRef) * 24;
+  return { x: obj.x + obj.dx_per_hr * h, y: obj.y + obj.dy_per_hr * h };
+}
+
+// Pick the "before" frame for `id`: ready, ≥1 h apart, closest in wavelength.
+export function pairFor(id, frames, payloads) {
+  const cur = payloads.get(id);
+  if (!cur) return null;
+  let best = null;
+  for (const f of frames) {
+    const p = payloads.get(f.id);
+    if (!p || f.id === id || Math.abs(p.mjd - cur.mjd) < HOUR) continue;
+    const d = Math.abs(p.wavelength_um - cur.wavelength_um);
+    if (!best || d < best.deltaUm) best = { before: f.id, deltaUm: d };
+  }
+  if (!best) return null;
+  return { ...best, warn: best.deltaUm > PAIR_WARN_UM };
+}
+
+// (after − before) / combined noise; NaN where either pixel is bad.
+export function diffSigma(a, b, sa, sb, badA, badB) {
+  const out = new Float32Array(a.length);
+  for (let i = 0; i < a.length; i++) {
+    const s = Math.sqrt(sa[i] * sa[i] + sb[i] * sb[i]);
+    out[i] = badA[i] || badB[i] || !(s > 0) ? NaN : (a[i] - b[i]) / s;
+  }
+  return out;
+}
+
+export function nearestKnown(x, y, sso, stars, r = 2) {
+  let best = null, bestD = r;
+  for (const o of [...sso, ...stars]) {
+    const d = Math.hypot(o.x - x, o.y - y);
+    if (d <= bestD) { best = o; bestD = d; }
+  }
+  return best;
+}

@@ -2,7 +2,57 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   parseRA, parseDec, stretch, orderLoad, decodeF32, wavelengthColor,
+  ssoAt, pairFor, diffSigma, nearestKnown,
 } from "./logic.js";
+
+test("ssoAt moves linearly", () => {
+  const o = { x: 5, y: 5, dx_per_hr: 10, dy_per_hr: -2 };
+  const p = ssoAt(o, 100, 100 + 1 / 24);
+  near(p.x, 15); near(p.y, 3);
+});
+
+test("pairFor picks closest wavelength at least 1 h apart", () => {
+  const frames = [{ id: "cur" }, { id: "a" }, { id: "b" }, { id: "soon" }];
+  const payloads = new Map([
+    ["cur", { wavelength_um: 1.40, mjd: 100 }],
+    ["a", { wavelength_um: 1.41, mjd: 101 }],
+    ["b", { wavelength_um: 1.60, mjd: 102 }],
+    ["soon", { wavelength_um: 1.40, mjd: 100.01 }], // < 1 h apart
+  ]);
+  const r = pairFor("cur", frames, payloads);
+  assert.equal(r.before, "a");
+  near(r.deltaUm, 0.01);
+  assert.equal(r.warn, false);
+});
+
+test("pairFor warns when only distant colours exist", () => {
+  const frames = [{ id: "cur" }, { id: "b" }];
+  const payloads = new Map([["cur", { wavelength_um: 1.4, mjd: 100 }], ["b", { wavelength_um: 1.6, mjd: 102 }]]);
+  const r = pairFor("cur", frames, payloads);
+  assert.equal(r.before, "b");
+  assert.equal(r.warn, true);
+});
+
+test("pairFor returns null with nothing to pair", () => {
+  assert.equal(pairFor("cur", [{ id: "cur" }], new Map([["cur", { wavelength_um: 1, mjd: 1 }]])), null);
+});
+
+test("diffSigma zero for identical, NaN on bad", () => {
+  const a = new Float32Array([1, 2, 3]), s = new Float32Array([1, 1, 1]);
+  const badA = new Uint8Array([0, 1, 0]), badB = new Uint8Array(3);
+  const d = diffSigma(a, a, s, s, badA, badB);
+  assert.equal(d[0], 0); assert.ok(Number.isNaN(d[1])); assert.equal(d[2], 0);
+  const d2 = diffSigma(new Float32Array([4]), new Float32Array([1]), new Float32Array([2]), new Float32Array([1]), new Uint8Array(1), new Uint8Array(1));
+  near(d2[0], 3 / Math.sqrt(5));
+});
+
+test("nearestKnown within radius only", () => {
+  const sso = [{ name: "rock", x: 10, y: 10 }];
+  const stars = [{ source_id: "s", x: 20, y: 20 }];
+  assert.equal(nearestKnown(11, 10, sso, stars).name, "rock");
+  assert.equal(nearestKnown(20, 21, sso, stars).source_id, "s");
+  assert.equal(nearestKnown(15, 15, sso, stars), null);
+});
 
 const near = (a, b, tol = 1e-3) => assert.ok(Math.abs(a - b) <= tol, `${a} != ${b}`);
 
