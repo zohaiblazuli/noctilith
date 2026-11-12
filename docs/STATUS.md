@@ -16,7 +16,7 @@ All plan tasks built and reviewed on branch `feat/time-explorer` (not merged yet
 3. Optional: Aladin background (CDS is unreachable from this machine), public hosting.
 
 ## Run it
-`python -m uvicorn server.app:app --port 8000` (or `./run.ps1`), then open http://localhost:8000
+Double-click `start.bat` (or `python -m uvicorn server.app:app --port 8000`), then open http://localhost:8000
 Tests: `python -m pytest -q` and `node --test "web/*.test.mjs"`
 
 ## Open questions for the user

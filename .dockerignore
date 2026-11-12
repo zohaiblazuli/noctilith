@@ -1,0 +1,8 @@
+cache/
+recon/
+tests/
+docs/
+.superpowers/
+.git/
+**/__pycache__/
+*.fits
