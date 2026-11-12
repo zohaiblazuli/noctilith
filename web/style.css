@@ -129,3 +129,5 @@ button.primary { background: var(--accent); color: #04121c; border-color: var(--
   .topbar { padding: 12px 16px; }
   .view-compare { grid-template-columns: 1fr; }
 }
+.star-toggle { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.star-toggle input { margin: 0; accent-color: #6eaaff; }

@@ -35,3 +35,5 @@ HDUs: `IMAGE` (MJy/sr, float32) · `FLAGS` (int32 bitmask; also marks known-sour
 ## Tools
 - Python 3.12, astropy, numpy, matplotlib, reproject are installed locally.
 - Aladin Lite (CDS): embeddable sky viewer with HiPS surveys (2MASS, WISE, Gaia).
+- Full L2 images are mirrored publicly at `https://nasa-irsa-spherex.s3.us-east-1.amazonaws.com/` + the path after `/ibe/data/spherex/`. Uncompressed 2040×2040 float32; HDUs IMAGE, FLAGS, VARIANCE, ZODI, PSF, WCS-WAVE. Range requests work. Cutout CRPIX keys to shift: CRPIX1/2, CRPIX1A/2A, CRPIX1W/2W.
+- This machine's download tops out at ~3 MB/s total (1 conn ~0.4 MB/s, 18 conns ~2.9 MB/s).

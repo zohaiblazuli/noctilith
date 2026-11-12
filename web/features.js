@@ -1,11 +1,12 @@
 // Overlays (known objects), click panel and Compare mode, layered on top of app.js.
 import { state, on, mainViewer, frameById, showFrame, stopPlay, syncUrl, initialMode, readyFrames } from "./app.js";
-import { ssoAt, pairFor, diffSigma, nearestKnown, PAIR_WARN_UM, spectrumAt, findChanges, isAppearance, isPointLike } from "./logic.js";
+import { ssoAt, pairFor, diffSigma, nearestKnown, PAIR_WARN_UM, spectrumAt, findChanges, isAppearance, isPointLike, onImage, brightest } from "./logic.js";
 import { Viewer } from "./viewer.js";
 import { showSpot, drawSpectrum } from "./panel.js";
 
 const $ = (id) => document.getElementById(id);
 const STAR_GMAX_SHOWN = 15;
+const MAX_STARS_SHOWN = 150; // big fields would otherwise be wall-to-wall rings
 const MAX_BOXES = 8;
 const EPOCH_GAP_D = 0.5;
 const epochOf = new Map(); // frame id -> epoch index
@@ -54,12 +55,14 @@ function ssoFor(frame, mjd) {
   return k.objs.map((o) => ({ ...o, ...ssoAt(o, k.mjdRef, mjd) }))
     .filter((o) => o.x > -3 && o.y > -3 && o.x < n + 2 && o.y < n + 2);
 }
-const starsShown = () => known.stars.filter((s) => s.gmag < STAR_GMAX_SHOWN);
+const starsShown = () => ($("showStars")?.checked === false ? []
+  : brightest(known.stars.filter((s) => s.gmag < STAR_GMAX_SHOWN), MAX_STARS_SHOWN));
 
 function overlaysFor(id) {
   const f = frameById(id), p = state.payloads.get(id);
   if (!f || !p) return {};
-  return { sso: ssoFor(f, p.mjd), stars: starsShown(), marker };
+  const n = state.target.n;
+  return { sso: onImage(ssoFor(f, p.mjd), p.img, n), stars: onImage(starsShown(), p.img, n), marker };
 }
 
 // ---------- compare ----------
@@ -171,3 +174,5 @@ vDiff.onPixelClick(onClick(() => state.current));
 vBefore.onPixelClick(onClick(() => currentPair?.before));
 
 if (initialMode === "compare") setMode("compare");
+
+$("showStars")?.addEventListener("change", refresh);

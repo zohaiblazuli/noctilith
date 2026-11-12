@@ -55,11 +55,12 @@ def _b64(a: np.ndarray, dtype) -> str:
     return base64.b64encode(np.ascontiguousarray(a, dtype=dtype).tobytes()).decode()
 
 
-def process_cutout(fits_bytes: bytes, ra: float, dec: float, fov: float) -> dict | None:
+def process_cutout(fits_bytes, ra: float, dec: float, fov: float) -> dict | None:
+    """fits_bytes: raw FITS bytes, or an already-built HDUList (see server.slicer)."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", AstropyWarning)
         logging.getLogger("astropy").setLevel(logging.ERROR)
-        hdul = fits.open(io.BytesIO(fits_bytes))
+        hdul = fits_bytes if isinstance(fits_bytes, fits.HDUList) else fits.open(io.BytesIO(fits_bytes))
         hdr = hdul["IMAGE"].header
         sky = WCS(hdr)
         grid, n = make_grid_wcs(ra, dec, fov)
@@ -101,8 +102,17 @@ async def get_frame(client: httpx.AsyncClient, meta, ra: float, dec: float, fov:
     hit = cache.get_json(k)
     if hit is not None:
         return hit.get("payload")
-    data = await fetch_cutout(client, meta.access_url, ra, dec, fov, sem)
-    payload = await asyncio.to_thread(process_cutout, data, ra, dec, fov)
+    from server import slicer  # lazy: slicer imports process_cutout from here
+    payload, done = None, False
+    mirror = slicer.mirror_url(meta.access_url)
+    if mirror:  # fast path: read only the needed rows from NASA's AWS copy
+        try:
+            payload, done = await slicer.slice_payload(client, mirror, ra, dec, fov, sem), True
+        except Exception as e:  # any trouble -> fall back to IRSA's cutout service
+            log.info("mirror slice failed for %s: %r", meta.id, e)
+    if not done:
+        data = await fetch_cutout(client, meta.access_url, ra, dec, fov, sem)
+        payload = await asyncio.to_thread(process_cutout, data, ra, dec, fov)
     if payload is not None:
         payload["id"] = meta.id
     cache.put_json(k, {"payload": payload})  # cache "no coverage" too

@@ -20,3 +20,5 @@ Append-only. Format: date · decision · why · who decided (user / Claude).
 - 2026-11-12 · Aladin background view skipped · CDS unreachable here, can't verify · Claude
 - 2026-11-12 · SIA answers cached on disk as a fallback; cutout retries capped at 3 × 25 s; external text escaped · final review findings · Claude
 - 2026-11-12 · Deferred minors (from final review): polar click-readout maths, NaN wavelength → 500, RA "10d30m" read as hours, Unicode minus, RA≈360 rounding in links, late frame jump, sync cache I/O, overlay requests queue behind cutouts · not demo-critical · Claude
+- 2026-11-12 · Fetch frames as byte-range row slices from the public S3 mirror (`nasa-irsa-spherex`), IRSA cutout as fallback · cutouts always carry a 5 MB PSF cube; the link here caps at ~3 MB/s; slices are ~3x fewer bytes, no IRSA queue/503s; output identical (max diff 0.0) · user asked for speed, Claude chose
+- 2026-11-12 · Overlay rings only where the frame has data; cap 150 brightest Gaia stars; star toggle · user saw rings over blank areas and clutter at 0.5° · user reported, Claude chose

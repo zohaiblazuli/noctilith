@@ -2,7 +2,7 @@ import { parseRA, parseDec, decodeF32, decodeU8, stretch, wavelengthColor, order
 import { Viewer } from "./viewer.js";
 
 const $ = (id) => document.getElementById(id);
-const LOAD_CONCURRENCY = 6;
+const LOAD_CONCURRENCY = 12;
 let abortCtl = new AbortController();
 
 export const state = {
@@ -147,7 +147,7 @@ function updateLoadStatus() {
   const c = { loading: 0, ready: 0, failed: 0, empty: 0 };
   state.status.forEach((s) => c[s]++);
   const parts = [`${c.ready} of ${state.frames.length} images ready`];
-  if (c.loading) parts.push(`${c.loading} loading (each takes ~15 s from NASA the first time)`);
+  if (c.loading) parts.push(`${c.loading} still downloading from NASA (first visit only)`);
   if (c.failed) parts.push(`${c.failed} failed (click a grey tile to retry)`);
   if (c.empty) parts.push(`${c.empty} only clip the edge of this spot`);
   const note = $("loadStatus").dataset.note;

@@ -8,7 +8,7 @@ from pathlib import Path
 class Settings:
     collection: str = "spherex_qr2"
     cache_dir: Path = field(default_factory=lambda: Path("cache"))
-    max_concurrency: int = 6
+    max_concurrency: int = 12
     pixel_arcsec: float = 6.15
     fov_min: float = 0.02
     fov_max: float = 0.5

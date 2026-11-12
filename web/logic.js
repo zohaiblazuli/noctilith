@@ -197,3 +197,16 @@ export function endOfLoadMessage({ ready, empty, failed }) {
   if (empty > 0) return "SPHEREx only clipped the edge of this spot, so there are no usable images yet. Try a nearby position.";
   return "No SPHEREx images cover this spot yet. Try a demo spot.";
 }
+
+// Keep only markers that land on real image pixels (not off the edge, not in the blank,
+// NaN area where this frame has no data).
+export function onImage(objs, img, n) {
+  return objs.filter((o) => {
+    const x = Math.round(o.x), y = Math.round(o.y);
+    return x >= 0 && y >= 0 && x < n && y < n && Number.isFinite(img[y * n + x]);
+  });
+}
+
+export function brightest(stars, max) {
+  return [...stars].sort((a, b) => a.gmag - b.gmag).slice(0, max);
+}

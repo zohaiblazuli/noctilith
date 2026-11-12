@@ -24,7 +24,7 @@ python -m uvicorn server.app:app --port 8000
 ```
 Then open http://localhost:8000. On Windows, `./run.ps1` does the last two steps and opens the browser.
 
-The first time a spot is opened, each image takes about 15 s to come from NASA's archive. After that it's served from the local `cache/` folder instantly.
+The first time a spot is opened, images download from NASA's public AWS copy of the data, reading only the pixels needed (about 1–2 images per second on a ~3 MB/s connection; IRSA's cutout service is the fallback). After that they're served from the local `cache/` folder instantly.
 
 ## How it works
 - `server/` (FastAPI) asks the NASA/IPAC archive (IRSA SIA) which SPHEREx images cover the spot. It downloads small cutouts (6 at a time, retrying when IRSA is busy), lines each one up north-up on a shared grid with astropy and reproject, marks bad pixels from the quality flags, and caches the result. It also looks up known asteroids (SkyBoT) and Gaia stars (ESA Gaia archive).

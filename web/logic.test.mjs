@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   parseRA, parseDec, stretch, orderLoad, decodeF32, wavelengthColor,
   ssoAt, pairFor, diffSigma, nearestKnown, spectrumAt, findChanges, isAppearance, isPointLike,
-  esc, endOfLoadMessage,
+  esc, endOfLoadMessage, onImage, brightest,
 } from "./logic.js";
 
 test("esc neutralises HTML", () => {
@@ -160,4 +160,15 @@ test("decodeF32 roundtrip", () => {
 test("wavelengthColor ends", () => {
   assert.equal(wavelengthColor(0.75), "hsl(240, 70%, 50%)");
   assert.equal(wavelengthColor(5.0), "hsl(0, 70%, 50%)");
+});
+
+test("onImage drops markers that sit outside the image or on blank (NaN) pixels", () => {
+  const n = 3, img = new Float32Array([1, 1, NaN, 1, 1, NaN, 1, 1, NaN]); // right column blank
+  const objs = [{ x: 0, y: 0 }, { x: 2, y: 1 }, { x: 1.4, y: 2.2 }, { x: -2, y: 1 }, { x: 1, y: 7 }];
+  assert.deepEqual(onImage(objs, img, n), [{ x: 0, y: 0 }, { x: 1.4, y: 2.2 }]);
+});
+
+test("brightest keeps the N lowest-magnitude stars", () => {
+  const s = [{ gmag: 14 }, { gmag: 9 }, { gmag: 12 }];
+  assert.deepEqual(brightest(s, 2).map((x) => x.gmag), [9, 12]);
 });

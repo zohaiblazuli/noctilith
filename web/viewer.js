@@ -26,7 +26,10 @@ export class Viewer {
         const src = y * n + x;
         const dst = ((n - 1 - y) * n + x) * 4;
         const v = img[src];
-        if (bad[src] || !Number.isFinite(v)) {
+        if (!Number.isFinite(v)) {
+          // this frame doesn't reach here: faint blue-grey, distinct from flagged pixels
+          id.data[dst] = 16; id.data[dst + 1] = 20; id.data[dst + 2] = 30;
+        } else if (bad[src]) {
           id.data[dst] = 60; id.data[dst + 1] = 20; id.data[dst + 2] = 30;
         } else {
           // asinh-ish soft stretch keeps bright stars from saturating flat
