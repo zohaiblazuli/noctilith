@@ -29,7 +29,8 @@ HDUs: `IMAGE` (MJy/sr, float32) · `FLAGS` (int32 bitmask; also marks known-sour
 
 ## Known objects
 - **SkyBoT** (IMCCE): `https://ssp.imcce.fr/webservices/skybot/api/conesearch.php?-ep={JD}&-ra={deg}&-dec={deg}&-rd={deg}&-mime=text&-output=basic&-loc=500`. Has **CORS: \***. Returns name, RA/Dec, V mag, dRA/dDec in arcsec/hr. Test spot: 5 known main-belt asteroids (V 20.5–23.4) within 0.5°.
-- **Gaia DR3** via VizieR TAP (`https://tapvizier.cds.unistra.fr/TAPVizieR/tap/sync`, table `I/355/gaiadr3`). Not yet verified; the curl quoting failed. Aladin Lite can also show Gaia directly.
+- **Gaia DR3**: the VizieR TAP endpoints (cds.unistra.fr and u-strasbg.fr) **time out from this machine**. The **ESA Gaia archive works**: `https://gea.esac.esa.int/tap-server/tap/sync`, table `gaiadr3.gaia_source`, columns `source_id, ra, dec, phot_g_mean_mag`, about 2 s. At (150, 2.2), radius 0.075°, G<17 gives 11 stars. Aladin Lite can also show Gaia directly.
+- SkyBoT live at (150, 2.2, 0.1°) at MJD 60998.4 gave 6 objects. Its `dRA` column is treated as already multiplied by cos(dec).
 
 ## Tools
 - Python 3.12, astropy, numpy, matplotlib, reproject are installed locally.
