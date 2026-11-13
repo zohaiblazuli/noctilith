@@ -1,10 +1,10 @@
-# SPHEREx Time Explorer
+# Time Explorer
 
 **Watch the infrared sky change. Find what moves.**
 
 Type a position on the sky (Right Ascension and Declination) and this tool plays every image NASA's **SPHEREx** telescope has taken of that patch, in time order, like a flipbook. Stars and galaxies stay put. Asteroids and comets drift. Anything that changes stands out, and the tool tells you whether it's already known.
 
-Built in 48 hours for the **NASA Space Apps Challenge 2026**.
+
 
 <p align="center">
   <img src="recon/sample_flipbook.gif" alt="SPHEREx frames of one sky patch played as a flipbook" width="420">
