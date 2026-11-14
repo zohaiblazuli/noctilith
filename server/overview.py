@@ -1,0 +1,143 @@
+"""Wide view: one whole SPHEREx detector image (~3.5 deg) around the target, north-up, as a PNG.
+
+The browser shows it zoomed out and can zoom right down to single SPHEREx pixels, because the
+PNG keeps every pixel. Only one frame is fetched (~17 MB image layer), so it costs ~10 s on a
+slow link instead of the hour that every frame at full width would take.
+"""
+import asyncio
+import io
+import math
+import warnings
+
+import httpx
+import numpy as np
+from astropy.utils.exceptions import AstropyWarning
+from astropy.wcs import WCS
+from PIL import Image
+from reproject import reproject_interp
+
+from server import cache, slicer
+from server.config import SETTINGS
+
+PREFERRED_DETECTORS = (1, 2)  # shortest wavelengths: sharpest stars, darkest sky
+TIMEOUT_S = 180
+_inflight: dict[str, asyncio.Task] = {}
+
+
+class OverviewError(Exception):
+    pass
+
+
+def _sep_deg(a: tuple[float, float], ra: float, dec: float) -> float:
+    dra = (a[0] - ra + 180) % 360 - 180
+    return math.hypot(dra * math.cos(math.radians(dec)), a[1] - dec)
+
+
+def pick_frame(frames, ra: float, dec: float):
+    """The frame whose detector centre is closest to the target (short-wavelength detector, newest on ties)."""
+    pool = ([f for f in frames if f.detector in PREFERRED_DETECTORS and f.center]
+            or [f for f in frames if f.center] or list(frames))
+    return min(pool, key=lambda f: (round(_sep_deg(f.center, ra, dec), 2) if f.center else 99, -f.mjd))
+
+
+def stretch_u8(img: np.ndarray) -> np.ndarray:
+    """Same asinh curve as web/logic.js stretch() + viewer: faint sky readable, bright cores not clipped."""
+    good = img[np.isfinite(img)]
+    if good.size == 0:
+        return np.zeros(img.shape, np.uint8)
+    sample = good[:: max(1, good.size // 400_000)]
+    med = float(np.median(sample))
+    mad = float(np.median(np.abs(sample - med))) or (float(sample.max() - sample.min()) / 20 or 1.0)
+    lo = med - 2 * mad
+    hi = max(med + 20 * mad, float(np.percentile(sample, 99.8)))
+    soft = 3 * mad
+    t = np.arcsinh(np.clip(np.nan_to_num(img, nan=lo) - lo, 0, None) / soft) / np.arcsinh((hi - lo) / soft)
+    return (np.clip(t, 0, 1) * 255).astype(np.uint8)
+
+
+def render(img: np.ndarray, hdr) -> tuple[bytes, dict]:
+    """Reproject a detector image (FITS orientation) onto a north-up TAN grid; return PNG bytes + grid info.
+
+    The grid matches server.grid.make_grid_wcs (same pixel size, centre at crpix (n+1)/2), so the
+    browser can turn grid pixels into RA/Dec with the same maths as the flipbook.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", AstropyWarning)
+        sky = WCS(hdr).celestial
+        ny, nx = img.shape
+        ra0, dec0 = (float(v) for v in sky.pixel_to_world_values((nx - 1) / 2, (ny - 1) / 2))
+        p = SETTINGS.pixel_arcsec / 3600.0
+
+        def grid(n):
+            w = WCS(naxis=2)
+            w.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+            w.wcs.crval = [ra0, dec0]
+            w.wcs.cdelt = [-p, p]
+            w.wcs.crpix = [(n + 1) / 2, (n + 1) / 2]
+            return w
+
+        # size the square grid to hold the rotated detector footprint
+        t = np.linspace(0, 1, 9)
+        ex = np.concatenate([t * (nx - 1), t * (nx - 1), np.zeros(9), np.full(9, nx - 1.0)])
+        ey = np.concatenate([np.zeros(9), np.full(9, ny - 1.0), t * (ny - 1), t * (ny - 1)])
+        big = 2 * max(nx, ny)
+        gx, gy = grid(big).world_to_pixel_values(*sky.pixel_to_world_values(ex, ey))
+        half = float(np.nanmax(np.abs(np.concatenate([gx, gy]) - (big - 1) / 2)))
+        n = 2 * int(math.ceil(half)) + 3
+        out, foot = reproject_interp((img, sky), grid(n), shape_out=(n, n))
+
+    out[foot <= 0] = np.nan
+    gray = stretch_u8(out)
+    alpha = np.where(np.isfinite(out), 255, 0).astype(np.uint8)
+    # PNG rows run top-down; grid row 0 is the bottom (south), so flip to put north up
+    png = io.BytesIO()
+    Image.fromarray(np.flipud(np.dstack([gray, alpha])), "LA").save(png, format="PNG", compress_level=6)
+    return png.getvalue(), {"ra0": ra0, "dec0": dec0, "n": n, "pixel_deg": p}
+
+
+async def _download_image(client: httpx.AsyncClient, access_url: str):
+    url = slicer.mirror_url(access_url)
+    if not url:
+        raise OverviewError("frame is not on the public mirror")
+    lay = await slicer.read_layout(client, url)
+    hdr, off, nbytes = lay["IMAGE"]
+    r = await client.get(url, headers={"Range": f"bytes={off}-{off + nbytes - 1}"}, timeout=TIMEOUT_S)
+    if r.status_code not in (200, 206):
+        raise OverviewError(f"HTTP {r.status_code}")
+    raw = r.content if r.status_code == 206 else r.content[off:off + nbytes]
+    if len(raw) != nbytes:
+        raise OverviewError("short read")
+    img = np.frombuffer(raw, ">f4").reshape(hdr["NAXIS2"], hdr["NAXIS1"]).astype(np.float32)
+    return img, hdr
+
+
+def png_path(frame_id: str):
+    k = cache.key("overview-v1", frame_id)
+    return SETTINGS.cache_dir / "overview" / f"{k}.png", k
+
+
+async def _build(client, meta) -> dict:
+    path, k = png_path(meta.id)
+    img, hdr = await _download_image(client, meta.access_url)
+    png, info = await asyncio.to_thread(render, img, hdr)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_bytes(png)
+    tmp.replace(path)
+    info.update(id=meta.id, iso=meta.iso, detector=meta.detector,
+                wavelength_um=(meta.band_um[0] + meta.band_um[1]) / 2)
+    cache.put_json(k, info)
+    return info
+
+
+async def get_overview(client: httpx.AsyncClient, meta) -> dict:
+    """Grid info for the frame's wide view, building (and caching) the PNG on first use."""
+    path, k = png_path(meta.id)
+    hit = cache.get_json(k)
+    if hit is not None and path.exists():
+        return hit
+    task = _inflight.get(meta.id)
+    if task is None:  # two clicks on Go share one download
+        task = _inflight[meta.id] = asyncio.create_task(_build(client, meta))
+        task.add_done_callback(lambda _t: _inflight.pop(meta.id, None))
+    return await task

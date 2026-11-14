@@ -5,12 +5,15 @@ from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from server.config import SETTINGS
 from server.cutout import CutoutError, get_frame
 from server.grid import make_grid_wcs
 from server.known import known_sso, known_stars
+from server.overview import OverviewError, get_overview, pick_frame, png_path
+from server.slicer import SliceError
 from server.sia import assign_bursts, cached_query_frames as query_frames
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -73,6 +76,31 @@ async def api_frame(id: str, ra: float = RA, dec: float = DEC, fov: float = FOV)
     if payload is None:
         raise HTTPException(404, "no coverage")
     return payload
+
+
+@app.get("/api/overview")
+async def api_overview(ra: float = RA, dec: float = DEC):
+    """One whole detector image around the target (the zoomed-out wide view)."""
+    try:
+        frames, _ = await _frames_for(ra, dec, SETTINGS.fov_default)
+    except httpx.HTTPError:
+        raise HTTPException(502, "IRSA unavailable, try again")
+    if not frames:
+        raise HTTPException(404, "no coverage")
+    meta = pick_frame(frames, ra, dec)
+    try:
+        info = await get_overview(app.state.client, meta)
+    except (httpx.HTTPError, SliceError, OverviewError):
+        raise HTTPException(502, "NASA's image server is unavailable, try again")
+    return {**info, "png": f"/api/overview.png?id={meta.id}"}
+
+
+@app.get("/api/overview.png")
+async def api_overview_png(id: str):
+    path, _ = png_path(id)  # hashed name, so id can't escape the cache folder
+    if not path.exists():
+        raise HTTPException(404, "not built yet")
+    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "max-age=86400"})
 
 
 @app.get("/api/known/sso")

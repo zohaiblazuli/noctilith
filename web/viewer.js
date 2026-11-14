@@ -12,6 +12,8 @@ export class Viewer {
     this.linkGroup = linkGroup;
     if (linkGroup) linkGroup.members.push(this);
     this.clickCb = null;
+    this.viewCb = null;
+    this.maxZoom = 12;
     this.message = "";
     this._bindEvents();
     new ResizeObserver(() => this.draw()).observe(canvas);
@@ -70,10 +72,29 @@ export class Viewer {
     this.draw();
   }
 
+  // Show a ready-made picture (the wide view PNG) at full resolution; n = its width in grid pixels.
+  setImage(bitmap, n) {
+    this._ensure(n);
+    this.offCtx.clearRect(0, 0, n, n);
+    this.offCtx.drawImage(bitmap, 0, 0);
+    this.message = "";
+    this.draw();
+  }
+
+  // Centre (grid x, y-up) and width (grid px) of what is on screen.
+  visibleRegion() {
+    const g = this._geom();
+    const x = (g.w / 2 - g.ox) / g.scale - 0.5;
+    const row = (g.h / 2 - g.oy) / g.scale - 0.5;
+    return { x, y: this.n - 1 - row, size: Math.min(g.w, g.h) / g.scale };
+  }
+
+  onViewChange(cb) { this.viewCb = cb; }
+
   setMessage(msg) { this.message = msg; this.draw(); }
   setOverlays(o) { this.overlays = { sso: [], stars: [], boxes: [], ...o }; this.draw(); }
   onPixelClick(cb) { this.clickCb = cb; }
-  resetView() { Object.assign(this.view, { zoom: 1, panX: 0, panY: 0 }); this._redrawGroup(); }
+  resetView() { Object.assign(this.view, { zoom: 1, panX: 0, panY: 0 }); this._redrawGroup(); this.viewCb?.(); }
 
   _ensure(n) {
     if (this.n !== n) {
@@ -105,7 +126,9 @@ export class Viewer {
     ctx.fillStyle = getComputedStyle(this.canvas).getPropertyValue("--viewer-bg") || "#05070d";
     ctx.fillRect(0, 0, g.w, g.h);
     if (this.n) {
-      ctx.imageSmoothingEnabled = false;
+      // smooth when shrinking a big picture (no sparkle), crisp blocks when zoomed past 1:1
+      ctx.imageSmoothingEnabled = g.scale < 1;
+      ctx.imageSmoothingQuality = "high";
       ctx.drawImage(this.off, g.ox, g.oy, this.n * g.scale, this.n * g.scale);
       this._drawOverlays(g);
     }
@@ -148,6 +171,16 @@ export class Viewer {
       ctx.strokeRect(cx - r * 1.3, cy - r * 1.3, r * 2.6, r * 2.6);
       ctx.fillText("candidate", cx + r * 1.4, cy - r * 1.3);
     }
+    if (this.overlays.rect) {  // area the flipbook will cover, in the wide view
+      const b = this.overlays.rect;
+      const [cx, cy] = this.toCanvas(b.x, b.y, g);
+      const half = (b.size * g.scale) / 2;
+      ctx.strokeStyle = "rgba(0,0,0,0.7)"; ctx.lineWidth = 4 * g.dpr;
+      ctx.strokeRect(cx - half, cy - half, half * 2, half * 2);
+      ctx.strokeStyle = "#ffd23a"; ctx.lineWidth = 2 * g.dpr;
+      ctx.strokeRect(cx - half, cy - half, half * 2, half * 2);
+      if (b.label) { ctx.fillStyle = "#ffd23a"; ctx.fillText(b.label, cx - half, cy - half - 4 * g.dpr); }
+    }
     if (this.overlays.marker) {
       const [cx, cy] = this.toCanvas(this.overlays.marker.x, this.overlays.marker.y, g);
       ctx.strokeStyle = "#7dffb0"; ctx.lineWidth = 1.5 * g.dpr;
@@ -170,9 +203,20 @@ export class Viewer {
     c.addEventListener("wheel", (e) => {
       e.preventDefault();
       const f = e.deltaY < 0 ? 1.2 : 1 / 1.2;
-      this.view.zoom = Math.max(1, Math.min(12, this.view.zoom * f));
-      if (this.view.zoom === 1) { this.view.panX = 0; this.view.panY = 0; }
+      // zoom toward the mouse: keep the sky point under the cursor where it is
+      const g = this._geom(), rect = c.getBoundingClientRect();
+      const px = (e.clientX - rect.left) * g.dpr, py = (e.clientY - rect.top) * g.dpr;
+      const u = (px - g.ox) / g.scale, v = (py - g.oy) / g.scale;
+      const z = Math.max(1, Math.min(this.maxZoom, this.view.zoom * f));
+      const s2 = (g.scale / this.view.zoom) * z;
+      this.view.zoom = z;
+      if (z === 1) { this.view.panX = 0; this.view.panY = 0; }
+      else {
+        this.view.panX = (px - u * s2 - (g.w - this.n * s2) / 2) / g.dpr;
+        this.view.panY = (py - v * s2 - (g.h - this.n * s2) / 2) / g.dpr;
+      }
       this._redrawGroup();
+      this.viewCb?.();
     }, { passive: false });
     c.addEventListener("pointerdown", (e) => {
       drag = { x: e.clientX, y: e.clientY, px: this.view.panX, py: this.view.panY, moved: false };
@@ -184,6 +228,7 @@ export class Viewer {
       if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
       if (drag.moved && this.view.zoom > 1) {
         this.view.panX = drag.px + dx; this.view.panY = drag.py + dy; this._redrawGroup();
+        this.viewCb?.();
       }
     });
     c.addEventListener("pointerup", (e) => {

@@ -184,3 +184,30 @@ test("brightest keeps the N lowest-magnitude stars", () => {
   const s = [{ gmag: 14 }, { gmag: 9 }, { gmag: 12 }];
   assert.deepEqual(brightest(s, 2).map((x) => x.gmag), [9, 12]);
 });
+
+import { gridToSky, skyToGrid, flipbookFov } from "./logic.js";
+
+test("wide-view grid <-> sky matches astropy", () => {
+  const g = { ra0: 10.485246, dec0: 41.483455, n: 2797, pixel_deg: 6.15 / 3600 };
+  const ref = [[100, 2500, 13.530863, 43.324937], [1398, 1398, 10.485246, 41.483455], [2700, 50, 7.620486, 39.146777]];
+  for (const [x, y, ra, dec] of ref) {
+    const [r, d] = gridToSky(g, x, y);
+    assert.ok(Math.abs(r - ra) < 1e-5 && Math.abs(d - dec) < 1e-5, `${x},${y} -> ${r},${d}`);
+    const [bx, by] = skyToGrid(g, ra, dec);
+    assert.ok(Math.abs(bx - x) < 0.01 && Math.abs(by - y) < 0.01, `round trip ${bx},${by}`);
+  }
+});
+
+test("gridToSky wraps RA across 0", () => {
+  const g = { ra0: 0.1, dec0: 0, n: 101, pixel_deg: 0.01 };
+  const [ra] = gridToSky(g, 100, 50); // 50 px west of centre = 0.5 deg lower RA
+  assert.ok(Math.abs(ra - 359.6) < 1e-4, String(ra));
+});
+
+test("flipbookFov picks the largest size that fits on screen, capped at 0.5", () => {
+  assert.equal(flipbookFov(0.02), 0.05); // never smaller than the smallest choice
+  assert.equal(flipbookFov(0.12), 0.1);
+  assert.equal(flipbookFov(0.24), 0.2);
+  assert.equal(flipbookFov(0.45), 0.2);  // 0.5 would spill off screen
+  assert.equal(flipbookFov(3.5), 0.5);
+});

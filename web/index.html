@@ -23,7 +23,7 @@
         title="Right Ascension: how far east around the sky, in degrees (0–360) or hours (10h00m00s)"></label>
       <label>Dec <input id="dec" name="dec" placeholder="+2.2 or +02:12:00" required
         title="Declination: how far north or south of the celestial equator, in degrees (−90 to +90)"></label>
-      <label>Field
+      <label hidden>Field
         <select id="fov" title="How much sky to show. Bigger fields catch faster objects but load slower.">
           <option value="0.05">0.05°</option>
           <option value="0.1" selected>0.1°</option>
@@ -44,10 +44,19 @@
     <section class="stage">
       <div class="modebar">
         <div class="seg" role="tablist" aria-label="View mode">
+          <button type="button" data-mode="wide" title="The whole SPHEREx image around this spot. Scroll to zoom, drag to move.">Wide view</button>
           <button type="button" data-mode="play" class="on">Play</button>
           <button type="button" data-mode="compare">Compare</button>
         </div>
         <div id="frameLabel" class="frame-label">Enter a position or pick a demo spot to begin.</div>
+      </div>
+
+      <div id="wideView" class="view-wide" hidden>
+        <canvas id="wideCanvas" class="viewer"></canvas>
+        <div class="wide-bar">
+          <button type="button" id="playArea" class="primary" disabled>▶ Play this area over time</button>
+          <span id="wideHint" class="wide-hint">Scroll to zoom in, drag to move. The yellow box is what will play.</span>
+        </div>
       </div>
 
       <div id="playView" class="view-play">

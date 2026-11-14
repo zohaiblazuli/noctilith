@@ -27,6 +27,7 @@ Type a position on the sky (Right Ascension and Declination) and this tool plays
 - [Data credits](#data-credits)
 
 ## Features
+- **Wide view**: entering a position first shows one whole SPHEREx image (~3.5° across), north-up. Scroll to zoom right down to single pixels without losing quality, drag to move, then press **Play this area over time** to load the yellow-boxed area from every frame.
 - **Play mode**: step through every SPHEREx frame of a spot. The timeline is coloured by the infrared wavelength each frame saw and grouped into visits.
 - **Compare mode**: before / after / difference panels. Frames are paired at the same wavelength, so differences are real changes rather than colour effects. Red means brighter now; blue means brighter before.
 - **"Is it known?" overlays**:
@@ -34,7 +35,7 @@ Type a position on the sky (Right Ascension and Declination) and this tool plays
   - Blue rings: Gaia stars (the 150 brightest in view).
   - Red boxes: **candidates**, meaning changes no catalogue explains.
 - **Click anything** to see its position, brightness and quality flags, plus a **spectrum** built from every visit. SPHEREx sees a spot at a different wavelength each time, so the visits together form a spectrum.
-- **Shareable URLs**: the address bar holds the position, field size, mode and frame, e.g. `/?ra=150&dec=2.2&fov=0.1&mode=compare`.
+- **Shareable URLs**: the address bar holds the position, field size, mode and frame, e.g. `/?ra=150&dec=2.2&fov=0.1&mode=compare`. A link with only `ra` and `dec` opens the wide view.
 - **Demo spots**: asteroids Abundantia, Menzel and De Sitter caught moving, plus the quiet COSMOS deep field.
 - **Always up to date**: the archive is queried live, so new SPHEREx releases appear without code changes.
 
@@ -65,8 +66,8 @@ python scripts/precache.py --only Menzel   # just one
 ```
 
 ## Using it
-1. Type RA and Dec in degrees (e.g. `150`, `2.2`) or pick **Try a demo spot…**.
-2. Frames stream in; grey tiles on the timeline are still loading, and clicking one retries it.
+1. Type RA and Dec in degrees (e.g. `150`, `2.2`) and press **Go**: the wide view opens (10–20 s the first time). Or pick **Try a demo spot…** to jump straight into a flipbook.
+2. Zoom into the part you care about and press **Play this area over time**. Frames stream in; grey tiles on the timeline are still loading, and clicking one retries it.
 3. Press **Play** to flip through time, or switch to **Compare** to see what changed.
 4. Toggle the overlays to check whether a moving or changing object is already catalogued.
 5. Click a source to open its details and spectrum.
@@ -94,6 +95,8 @@ All endpoints take `ra`, `dec` (degrees) and `fov` (field of view in degrees, 0.
 |---|---|
 | `GET /api/frames` | Every SPHEREx frame covering the spot, grouped into visits |
 | `GET /api/frame?id=…` | One reprojected frame (pixels + mask) |
+| `GET /api/overview?ra&dec` | Builds the wide view: picks the best-centred frame, returns its north-up grid info |
+| `GET /api/overview.png?id=…` | The wide-view picture itself (full resolution PNG) |
 | `GET /api/known/sso?mjd=…` | Known asteroids and comets in view at that time (SkyBoT) |
 | `GET /api/known/stars` | Gaia stars in view |
 

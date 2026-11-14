@@ -3,6 +3,7 @@ import { state, on, mainViewer, frameById, showFrame, stopPlay, syncUrl, initial
 import { ssoAt, pairFor, diffSigma, nearestKnown, PAIR_WARN_UM, spectrumAt, findChanges, isAppearance, isPointLike, onImage, brightest } from "./logic.js";
 import { Viewer } from "./viewer.js";
 import { showSpot, drawSpectrum } from "./panel.js";
+import { initWide, onWideShown, onPlayShown } from "./wide.js";
 
 const $ = (id) => document.getElementById(id);
 const STAR_GMAX_SHOWN = 15;
@@ -123,10 +124,14 @@ function setMode(mode) {
   document.querySelectorAll(".seg button").forEach((b) => b.classList.toggle("on", b.dataset.mode === mode));
   $("playView").hidden = mode !== "play";
   $("compareView").hidden = mode !== "compare";
+  $("wideView").hidden = mode !== "wide";
+  document.querySelector(".stage").classList.toggle("wide", mode === "wide");
   if (mode === "compare") { stopPlay(); renderCompare(); }
-  else refresh();
+  else if (mode === "wide") { stopPlay(); onWideShown(); }
+  else { onPlayShown(); refresh(); }
   syncUrl();
 }
+initWide(setMode);
 document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
 on("onModeChange", (kind, id) => {
   if (kind === "pin-before") { pinnedBefore = id; renderCompare(); }

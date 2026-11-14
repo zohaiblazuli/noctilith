@@ -213,3 +213,35 @@ export function onImage(objs, img, n) {
 export function brightest(stars, max) {
   return [...stars].sort((a, b) => a.gmag - b.gmag).slice(0, max);
 }
+
+// ---------- wide view: north-up TAN grid (matches server/overview.py and server/grid.py) ----------
+const D2R = Math.PI / 180;
+
+// Grid pixel (x, y-up, 0-based) -> [ra, dec] in degrees. g = {ra0, dec0, n, pixel_deg}.
+export function gridToSky(g, x, y) {
+  const c = (g.n - 1) / 2;
+  const xi = -(x - c) * g.pixel_deg * D2R, eta = (y - c) * g.pixel_deg * D2R;
+  const d0 = g.dec0 * D2R;
+  const den = Math.cos(d0) - eta * Math.sin(d0);
+  const ra = g.ra0 + Math.atan2(xi, den) / D2R;
+  const dec = Math.atan2(Math.sin(d0) + eta * Math.cos(d0), Math.hypot(xi, den)) / D2R;
+  return [((ra % 360) + 360) % 360, dec];
+}
+
+// [ra, dec] degrees -> grid pixel [x, y-up] on the same grid.
+export function skyToGrid(g, ra, dec) {
+  const d0 = g.dec0 * D2R, d = dec * D2R, dra = (ra - g.ra0) * D2R;
+  const cosc = Math.sin(d0) * Math.sin(d) + Math.cos(d0) * Math.cos(d) * Math.cos(dra);
+  const xi = (Math.cos(d) * Math.sin(dra)) / cosc / D2R;
+  const eta = (Math.cos(d0) * Math.sin(d) - Math.sin(d0) * Math.cos(d) * Math.cos(dra)) / cosc / D2R;
+  const c = (g.n - 1) / 2;
+  return [c - xi / g.pixel_deg, c + eta / g.pixel_deg];
+}
+
+export const FOV_CHOICES = [0.05, 0.1, 0.2, 0.5];
+
+// Flipbook size for a wide-view region `visibleDeg` across: the largest choice that still fits
+// on screen (so its box is visible), at least the smallest; 0.5° is the cap (bigger loads too slowly).
+export function flipbookFov(visibleDeg) {
+  return [...FOV_CHOICES].reverse().find((f) => f <= visibleDeg * 0.9) ?? FOV_CHOICES[0];
+}

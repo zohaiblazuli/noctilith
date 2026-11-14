@@ -22,6 +22,7 @@ class FrameMeta:
     access_url: str
     band_um: tuple[float, float]
     burst: int = -1
+    center: tuple[float, float] | None = None  # detector centre (ra, dec), for the wide view
 
     @property
     def id(self) -> str:
@@ -32,6 +33,7 @@ class FrameMeta:
         d = asdict(self)
         d["id"] = self.id
         d["band_um"] = list(self.band_um)
+        d["center"] = list(self.center) if self.center else None
         return d
 
 
@@ -48,6 +50,7 @@ def parse_sia_csv(text: str) -> list[FrameMeta]:
             iso=Time(mjd, format="mjd").isot[:19],
             access_url=r["access_url"],
             band_um=(float(r["em_min"]) * 1e6, float(r["em_max"]) * 1e6),
+            center=(float(r["s_ra"]), float(r["s_dec"])) if r.get("s_ra") and r.get("s_dec") else None,
         ))
     frames.sort(key=lambda f: f.mjd)
     return frames
@@ -96,6 +99,7 @@ async def cached_query_frames(client: httpx.AsyncClient, ra: float, dec: float, 
         hit = cache.get_json(k)
         if hit is None:
             raise
-        return [FrameMeta(**{**d, "band_um": tuple(d["band_um"])}) for d in hit]
+        return [FrameMeta(**{**d, "band_um": tuple(d["band_um"]),
+                             "center": tuple(d["center"]) if d.get("center") else None}) for d in hit]
     cache.put_json(k, [{kk: v for kk, v in f.to_dict().items() if kk != "id"} for f in frames])
     return frames

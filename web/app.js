@@ -18,9 +18,9 @@ export const state = {
   token: 0,            // bumps on every new target, cancels stale loads
 };
 
-const hooks = { onFrameShown: [], onTargetLoaded: [], onModeChange: [] };
+const hooks = { onFrameShown: [], onTargetLoaded: [], onModeChange: [], onWideRequest: [] };
 export const on = (name, fn) => hooks[name].push(fn);
-const emit = (name, ...a) => hooks[name].forEach((fn) => fn(...a));
+export const emit = (name, ...a) => hooks[name].forEach((fn) => fn(...a));
 
 export const mainViewer = new Viewer($("mainCanvas"));
 
@@ -39,8 +39,15 @@ function setError(msg) { $("formError").textContent = msg || ""; }
 
 // ---------- URL ----------
 function syncUrl() {
-  if (!state.target) return; // keep the incoming URL until a target has loaded
   const p = new URLSearchParams();
+  if (state.mode === "wide" && state.wide) {
+    p.set("ra", String(+state.wide.ra.toFixed(5)));
+    p.set("dec", String(+state.wide.dec.toFixed(5)));
+    p.set("mode", "wide");
+    history.replaceState(null, "", `${location.pathname}?${p}`);
+    return;
+  }
+  if (!state.target) return; // keep the incoming URL until a target has loaded
   if (state.target) {
     p.set("ra", String(+state.target.ra.toFixed(5)));
     p.set("dec", String(+state.target.dec.toFixed(5)));
@@ -53,7 +60,15 @@ function syncUrl() {
 export { syncUrl };
 
 // ---------- loading ----------
-async function loadTarget(ra, dec, fov, wantFrame = null, focusMjd = null) {
+// Stop downloading the current spot's frames (e.g. a new spot was opened in the wide view).
+export function cancelLoads() {
+  state.token++;
+  abortCtl.abort();
+  abortCtl = new AbortController();
+}
+
+export async function loadTarget(ra, dec, fov, wantFrame = null, focusMjd = null) {
+  state.wideNewer = false;
   const token = ++state.token;
   abortCtl.abort();               // cancel the previous spot's in-flight downloads
   abortCtl = new AbortController();
@@ -269,7 +284,7 @@ $("search").addEventListener("submit", (e) => {
   const ra = parseRA($("ra").value), dec = parseDec($("dec").value);
   if (ra === null) return setError("RA should be 0–360 degrees (e.g. 150.0) or hours like 10h00m00s.");
   if (dec === null) return setError("Dec should be −90 to +90 degrees (e.g. +2.2 or +02:12:00).");
-  loadTarget(ra, dec, +$("fov").value);
+  emit("onWideRequest", ra, dec); // start zoomed out; the user picks an area to play (wide.js)
 });
 $("play").addEventListener("click", () => (state.playing ? stopPlay() : startPlay()));
 $("prev").addEventListener("click", () => { stopPlay(); step(-1); });
@@ -324,7 +339,12 @@ if (q.get("ra") && q.get("dec")) {
   const fov = [0.05, 0.1, 0.2, 0.5].includes(+q.get("fov")) ? +q.get("fov") : 0.1;
   if (ra !== null && dec !== null) {
     $("ra").value = q.get("ra"); $("dec").value = q.get("dec"); $("fov").value = String(fov);
-    queueMicrotask(() => loadTarget(ra, dec, fov, q.get("frame")));
+    // a plain ra/dec link opens the wide view; links with a field size or frame open the flipbook
+    if (q.get("mode") === "wide" || (!q.get("fov") && !q.get("frame"))) {
+      document.addEventListener("DOMContentLoaded", () => emit("onWideRequest", ra, dec));
+    } else {
+      queueMicrotask(() => loadTarget(ra, dec, fov, q.get("frame")));
+    }
   }
 } else {
   mainViewer.setMessage("Enter RA/Dec above, or pick a demo spot.");
