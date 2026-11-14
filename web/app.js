@@ -1,4 +1,4 @@
-import { parseRA, parseDec, decodeF32, decodeU8, stretch, wavelengthColor, orderLoad, endOfLoadMessage } from "./logic.js";
+import { parseRA, parseDec, decodeF32, decodeU8, stretch, wavelengthColor, orderLoad, endOfLoadMessage, visitGroups, stackPayloads } from "./logic.js";
 import { Viewer } from "./viewer.js";
 
 const $ = (id) => document.getElementById(id);
@@ -16,7 +16,10 @@ export const state = {
   playing: false,
   detector: "all",
   token: 0,            // bumps on every new target, cancels stale loads
+  stack: false,        // "one image per visit": play combined visit images instead of single frames
+  stackFrames: [],     // synthetic frames for the visit images (see refreshStacks)
 };
+const stackCache = new Map(); // visit id -> {sig, p}: rebuilt only when its set of ready frames changes
 
 const hooks = { onFrameShown: [], onTargetLoaded: [], onModeChange: [], onWideRequest: [] };
 export const on = (name, fn) => hooks[name].push(fn);
@@ -25,7 +28,7 @@ export const emit = (name, ...a) => hooks[name].forEach((fn) => fn(...a));
 export const mainViewer = new Viewer($("mainCanvas"));
 
 // ---------- helpers ----------
-export const frameById = (id) => state.frames.find((f) => f.id === id);
+export const frameById = (id) => state.frames.find((f) => f.id === id) || state.stackFrames.find((f) => f.id === id);
 export const wavelengthOf = (f) => {
   const p = state.payloads.get(f.id);
   return p ? p.wavelength_um : (f.band_um[0] + f.band_um[1]) / 2;
@@ -54,6 +57,7 @@ function syncUrl() {
     p.set("fov", String(state.target.fov));
   }
   if (state.mode !== "play") p.set("mode", state.mode);
+  if (state.stack) p.set("stack", "1");
   if (state.current) p.set("frame", state.current);
   history.replaceState(null, "", `${location.pathname}?${p}`);
 }
@@ -74,8 +78,8 @@ export async function loadTarget(ra, dec, fov, wantFrame = null, focusMjd = null
   abortCtl = new AbortController();
   if (focusMjd === null) delete $("loadStatus").dataset.note;
   stopPlay();
-  Object.assign(state, { frames: [], bursts: [], current: null });
-  state.payloads.clear(); state.status.clear();
+  Object.assign(state, { frames: [], bursts: [], current: null, stackFrames: [] });
+  state.payloads.clear(); state.status.clear(); stackCache.clear();
   mainViewer.setOverlays({});
   mainViewer.setMessage("Asking NASA's archive for SPHEREx images of this spot…");
   $("frameLabel").textContent = "";
@@ -235,18 +239,55 @@ function applyDetectorFilter() {
 }
 
 // ---------- showing frames ----------
+// ---------- one image per visit ----------
+const isoFromMjd = (mjd) => new Date((mjd - 40587) * 86400000).toISOString().slice(0, 19);
+
+// Rebuild the visit images from whatever frames are ready (respects the Detector filter).
+function refreshStacks() {
+  const out = [];
+  visitGroups(visibleFrames()).forEach((g) => {
+    const ready = g.ids.filter((fid) => state.status.get(fid) === "ready");
+    if (!ready.length) return;
+    const id = `visit:${g.key}:${state.detector}`;
+    const sig = ready.join(",");
+    let c = stackCache.get(id);
+    if (!c || c.sig !== sig) {
+      const p = stackPayloads(ready.map((fid) => state.payloads.get(fid)));
+      p.scale = stretch(p.img, p.badArr);
+      p.id = id;
+      c = { sig, p };
+      stackCache.set(id, c);
+    }
+    state.payloads.set(id, c.p);
+    const first = state.frames.find((f) => f.id === g.ids[0]);
+    out.push({ id, stack: true, members: ready, total: g.ids.length, mjd: c.p.mjd, iso: isoFromMjd(c.p.mjd),
+               burst: first.burst, detector: state.detector, band_um: first.band_um });
+  });
+  out.forEach((f, i) => { f.visit = i + 1; });
+  state.stackFrames = out;
+}
+
 export function showFrame(id) {
   const f = frameById(id), p = state.payloads.get(id);
   if (!f || !p) return;
   state.current = id;
   mainViewer.setGray(p.img, p.badArr, p.n, p.scale.lo, p.scale.hi, p.scale.soft);
-  const ready = readyFrames();
-  const idx = ready.findIndex((r) => r.id === id);
-  $("frameLabel").innerHTML =
-    `Frame <b>${idx + 1}</b> of ${ready.length} ready · <b>${fmtTime(f.iso)}</b> · λ = <b>${p.wavelength_um.toFixed(2)} µm</b> · detector D${f.detector}`;
+  if (f.stack) {
+    const missing = f.total - f.members.length;
+    $("frameLabel").innerHTML =
+      `Visit <b>${f.visit}</b> of ${state.stackFrames.length} · <b>${fmtTime(f.iso)}</b> · <b>${f.members.length}</b> frames combined` +
+      (missing ? ` (${missing} still loading)` : "") +
+      ` · ${f.detector === "all" ? "all detectors" : `detector D${f.detector}`} · avg λ ${p.wavelength_um.toFixed(2)} µm`;
+  } else {
+    const ready = readyFrames();
+    const idx = ready.findIndex((r) => r.id === id);
+    $("frameLabel").innerHTML =
+      `Frame <b>${idx + 1}</b> of ${ready.length} ready · <b>${fmtTime(f.iso)}</b> · λ = <b>${p.wavelength_um.toFixed(2)} µm</b> · detector D${f.detector}`;
+  }
   $("timeline").querySelectorAll(".tile.current").forEach((el) => el.classList.remove("current"));
-  const el = tileEl(id);
-  if (el) { el.classList.add("current"); el.scrollIntoView({ block: "nearest", inline: "nearest" }); }
+  for (const mid of f.stack ? f.members : [id]) tileEl(mid)?.classList.add("current");
+  const el = tileEl(f.stack ? f.members[0] : id);
+  if (el) el.scrollIntoView({ block: "nearest", inline: "nearest" });
   if ($("burst").value !== "all" && String(f.burst) !== $("burst").value) $("burst").value = "all";
   syncUrl();
   emit("onFrameShown", f, p);
@@ -254,7 +295,19 @@ export function showFrame(id) {
 
 function playable() {
   const b = $("burst").value;
-  return readyFrames().filter((f) => b === "all" || String(f.burst) === b);
+  if (state.stack) refreshStacks();
+  return (state.stack ? state.stackFrames : readyFrames()).filter((f) => b === "all" || String(f.burst) === b);
+}
+
+// After switching frames <-> visits (or detector), show the matching item closest in time.
+function showNearest() {
+  const list = playable();
+  if (!list.length) return;
+  const cur = frameById(state.current);
+  const t = cur ? cur.mjd : list[0].mjd;
+  const single = cur && (cur.stack ? cur.members[0] : cur.id);
+  const hit = single && list.find((f) => (f.stack ? f.members.includes(single) : f.id === single));
+  showFrame((hit || list.reduce((a, f) => (Math.abs(f.mjd - t) < Math.abs(a.mjd - t) ? f : a))).id);
 }
 
 function step(dir) {
@@ -301,7 +354,13 @@ $("detector").addEventListener("change", () => {
   state.detector = $("detector").value;
   applyDetectorFilter();
   const cur = frameById(state.current);
-  if (cur && state.detector !== "all" && String(cur.detector) !== state.detector) step(1);
+  if (state.stack) showNearest();
+  else if (cur && state.detector !== "all" && String(cur.detector) !== state.detector) step(1);
+});
+$("stackVisits").addEventListener("change", () => {
+  state.stack = $("stackVisits").checked;
+  showNearest();
+  syncUrl();
 });
 $("share").addEventListener("click", async () => {
   syncUrl();
@@ -334,6 +393,7 @@ fetch("demo-spots.json").then((r) => r.json()).then((spots) => {
 // start from URL
 const q = new URLSearchParams(location.search);
 export const initialMode = q.get("mode") === "compare" ? "compare" : "play";
+if (q.get("stack") === "1") { state.stack = true; $("stackVisits").checked = true; }
 if (q.get("ra") && q.get("dec")) {
   const ra = parseRA(q.get("ra")), dec = parseDec(q.get("dec"));
   const fov = [0.05, 0.1, 0.2, 0.5].includes(+q.get("fov")) ? +q.get("fov") : 0.1;

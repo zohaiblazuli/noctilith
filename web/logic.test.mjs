@@ -211,3 +211,27 @@ test("flipbookFov picks the largest size that fits on screen, capped at 0.5", ()
   assert.equal(flipbookFov(0.45), 0.2);  // 0.5 would spill off screen
   assert.equal(flipbookFov(3.5), 0.5);
 });
+
+import { visitGroups, stackPayloads } from "./logic.js";
+
+test("visitGroups splits on 12 h gaps and caps a visit at 1 day", () => {
+  const fr = (id, mjd) => ({ id, mjd });
+  // a: two frames 1 h apart; gap of 2 days; b: continuous deep-style frames every 6 h for 2.5 days
+  const frames = [fr("a1", 100), fr("a2", 100.04), ...[0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5].map((d, i) => fr(`b${i}`, 102 + d))];
+  const g = visitGroups(frames);
+  assert.deepEqual(g.map((x) => x.ids.length), [2, 5, 5, 1]); // 1-day cap is inclusive
+  assert.equal(g[0].key, "a1"); // stable key = first frame
+});
+
+test("stackPayloads is a noise-weighted mean that skips bad pixels", () => {
+  const P = (img, sig, bad) => ({ n: 2, img: Float32Array.from(img), sig: Float32Array.from(sig), badArr: Uint8Array.from(bad), wavelength_um: 1, mjd: 5 });
+  const s = stackPayloads([
+    P([10, 10, 1, 7], [1, 1, 1, 1], [0, 0, 0, 1]),
+    P([20, 20, 3, 9], [1, 2, 1, 1], [0, 0, 0, 1]),
+  ]);
+  assert.equal(s.img[0], 15);                         // equal noise -> plain mean
+  assert.ok(Math.abs(s.img[1] - 12) < 1e-6);          // 2nd frame 4x noisier variance -> weight 1/4
+  assert.ok(Math.abs(s.sig[0] - Math.SQRT1_2) < 1e-6); // noise drops by sqrt(2)
+  assert.equal(s.badArr[3], 1);                        // bad everywhere stays bad...
+  assert.equal(s.img[3], 8);                           // ...but still drawn (plain mean)
+});

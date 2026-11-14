@@ -50,7 +50,7 @@ on("onTargetLoaded", async () => {
 });
 
 function ssoFor(frame, mjd) {
-  const k = known.sso.get(epochOf.get(frame.id));
+  const k = known.sso.get(epochOf.get(frame.members?.[0] ?? frame.id)); // visit images use their first frame
   if (!k) return [];
   const n = state.target.n;
   return k.objs.map((o) => ({ ...o, ...ssoAt(o, k.mjdRef, mjd) }))
@@ -74,7 +74,9 @@ const vDiff = new Viewer($("cDiff"), { linkGroup: group });
 let currentPair = null;
 
 function renderCompare() {
-  const id = state.current;
+  let id = state.current;
+  const cf = frameById(id);
+  if (cf?.stack) id = cf.members[cf.members.length - 1]; // Compare works on single frames
   const after = state.payloads.get(id);
   if (!after) return;
   let pair = pinnedBefore && pinnedBefore !== id && state.payloads.has(pinnedBefore)

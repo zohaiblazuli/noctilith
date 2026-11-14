@@ -245,3 +245,45 @@ export const FOV_CHOICES = [0.05, 0.1, 0.2, 0.5];
 export function flipbookFov(visibleDeg) {
   return [...FOV_CHOICES].reverse().find((f) => f <= visibleDeg * 0.9) ?? FOV_CHOICES[0];
 }
+
+// ---------- one image per visit (WiseView-style) ----------
+export const VISIT_GAP_D = 0.5;  // new visit after a 12 h gap...
+export const VISIT_MAX_D = 1.0;  // ...or after 1 day (deep-survey fields are watched nearly nonstop)
+
+// Group frames (any objects with id, mjd) into visits; key = first frame's id (stable as frames load).
+export function visitGroups(frames, gap = VISIT_GAP_D, maxSpan = VISIT_MAX_D) {
+  const out = [];
+  let cur = null, prev = null;
+  for (const f of [...frames].sort((a, b) => a.mjd - b.mjd)) {
+    if (!cur || f.mjd - prev > gap || f.mjd - cur.start > maxSpan) {
+      cur = { key: f.id, start: f.mjd, ids: [] };
+      out.push(cur);
+    }
+    cur.ids.push(f.id);
+    prev = f.mjd;
+  }
+  return out;
+}
+
+// Combine same-grid payloads into one: inverse-variance weighted mean of good pixels (noise drops
+// ~1/sqrt(frames)). Pixels bad in every frame stay flagged but are drawn with the plain mean.
+export function stackPayloads(list) {
+  const n = list[0].n, N = n * n;
+  const img = new Float32Array(N), sig = new Float32Array(N), badArr = new Uint8Array(N);
+  for (let i = 0; i < N; i++) {
+    let sw = 0, swx = 0, s = 0, c = 0;
+    for (const p of list) {
+      const v = p.img[i];
+      if (!Number.isFinite(v)) continue;
+      s += v; c++;
+      const e = p.sig[i];
+      if (p.badArr[i] || !(e > 0)) continue;
+      const w = 1 / (e * e);
+      sw += w; swx += w * v;
+    }
+    if (sw > 0) { img[i] = swx / sw; sig[i] = 1 / Math.sqrt(sw); }
+    else { img[i] = c ? s / c : NaN; sig[i] = NaN; badArr[i] = 1; }
+  }
+  const mean = (k) => list.reduce((a, p) => a + p[k], 0) / list.length;
+  return { n, img, sig, badArr, mjd: mean("mjd"), wavelength_um: mean("wavelength_um"), count: list.length };
+}
