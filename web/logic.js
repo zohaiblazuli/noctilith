@@ -62,7 +62,10 @@ export function stretch(img, bad) {
   const dev = good.map((v) => Math.abs(v - med)).sort((a, b) => a - b);
   let mad = median(dev);
   if (!(mad > 0)) mad = (good[good.length - 1] - good[0]) / 20 || 1;
-  return { lo: med - 2 * mad, hi: med + 20 * mad };
+  // Top of the range = a near-brightest pixel, so galaxy cores and bright stars roll off
+  // instead of clipping; `soft` is where the asinh curve starts compressing (~noise level).
+  const p998 = good[Math.min(good.length - 1, Math.floor(good.length * 0.998))];
+  return { lo: med - 2 * mad, hi: Math.max(med + 20 * mad, p998), soft: 3 * mad };
 }
 
 export function wavelengthColor(um) {

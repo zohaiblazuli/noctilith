@@ -82,7 +82,7 @@ function renderCompare() {
   if (pair) pair.warn = pair.deltaUm > PAIR_WARN_UM;
   currentPair = pair;
   $("timeline").querySelectorAll(".tile.before").forEach((el) => el.classList.remove("before"));
-  vAfter.setGray(after.img, after.badArr, after.n, after.scale.lo, after.scale.hi);
+  vAfter.setGray(after.img, after.badArr, after.n, after.scale.lo, after.scale.hi, after.scale.soft);
   vAfter.setOverlays(overlaysFor(id));
   const fa = frameById(id);
   $("capAfter").textContent = `After · ${fa.iso.slice(0, 16).replace("T", " ")} · λ ${after.wavelength_um.toFixed(2)} µm`;
@@ -94,7 +94,7 @@ function renderCompare() {
     return;
   }
   const before = state.payloads.get(pair.before), fb = frameById(pair.before);
-  vBefore.setGray(before.img, before.badArr, before.n, before.scale.lo, before.scale.hi);
+  vBefore.setGray(before.img, before.badArr, before.n, before.scale.lo, before.scale.hi, before.scale.soft);
   vBefore.setOverlays(overlaysFor(pair.before));
   $("capBefore").textContent = `Before · ${fb.iso.slice(0, 16).replace("T", " ")} · λ ${before.wavelength_um.toFixed(2)} µm`;
   const diff = diffSigma(after.img, before.img, after.sig, before.sig, after.badArr, before.badArr);

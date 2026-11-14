@@ -224,7 +224,7 @@ export function showFrame(id) {
   const f = frameById(id), p = state.payloads.get(id);
   if (!f || !p) return;
   state.current = id;
-  mainViewer.setGray(p.img, p.badArr, p.n, p.scale.lo, p.scale.hi);
+  mainViewer.setGray(p.img, p.badArr, p.n, p.scale.lo, p.scale.hi, p.scale.soft);
   const ready = readyFrames();
   const idx = ready.findIndex((r) => r.id === id);
   $("frameLabel").innerHTML =

@@ -17,24 +17,24 @@ export class Viewer {
     new ResizeObserver(() => this.draw()).observe(canvas);
   }
 
-  setGray(img, bad, n, lo, hi) {
+  // Flagged (bad) pixels are drawn with their real value like the raw image; the flags only
+  // keep them out of the stretch, spectrum and change detection. `bad` is unused here on purpose.
+  setGray(img, bad, n, lo, hi, soft = (hi - lo) / 3) {
     this._ensure(n);
     const id = this.offCtx.createImageData(n, n);
-    const span = hi - lo || 1;
+    const k = soft > 0 ? soft : (hi - lo) / 3 || 1;
+    const norm = Math.asinh((hi - lo) / k) || 1;
     for (let y = 0; y < n; y++) {
       for (let x = 0; x < n; x++) {
         const src = y * n + x;
         const dst = ((n - 1 - y) * n + x) * 4;
         const v = img[src];
         if (!Number.isFinite(v)) {
-          // this frame doesn't reach here: faint blue-grey, distinct from flagged pixels
+          // this frame doesn't reach here: faint blue-grey
           id.data[dst] = 16; id.data[dst + 1] = 20; id.data[dst + 2] = 30;
-        } else if (bad[src]) {
-          id.data[dst] = 60; id.data[dst + 1] = 20; id.data[dst + 2] = 30;
         } else {
-          // asinh-ish soft stretch keeps bright stars from saturating flat
-          let t = (v - lo) / span;
-          t = Math.max(0, Math.min(1, Math.asinh(t * 3) / Math.asinh(3)));
+          // asinh stretch: linear near the sky level, logarithmic for bright cores and stars
+          const t = Math.max(0, Math.min(1, Math.asinh(Math.max(0, v - lo) / k) / norm));
           const g = Math.round(t * 255);
           id.data[dst] = g; id.data[dst + 1] = g; id.data[dst + 2] = g;
         }

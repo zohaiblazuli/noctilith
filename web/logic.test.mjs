@@ -144,6 +144,18 @@ test("stretch ignores bad pixels", () => {
   assert.ok(b.hi < 1e6);
 });
 
+test("stretch keeps a bright galaxy core inside the range", () => {
+  // noisy sky (values ~0..1) with a smooth bright core peaking at 200 over ~4% of pixels
+  const n = 50, img = new Float32Array(n * n), bad = new Uint8Array(n * n);
+  for (let i = 0; i < n * n; i++) {
+    const x = i % n - 25, y = Math.floor(i / n) - 25;
+    img[i] = ((i * 7919) % 100) / 100 + 200 * Math.exp(-(x * x + y * y) / 8);
+  }
+  const s = stretch(img, bad);
+  assert.ok(s.hi > 100, `core should not clip: hi=${s.hi}`);
+  assert.ok(s.soft > 0 && s.soft < 2, `knee near the noise level: soft=${s.soft}`);
+});
+
 test("orderLoad newest burst first, time order within", () => {
   const frames = [
     { id: "a", burst: 0, mjd: 1 }, { id: "b", burst: 0, mjd: 2 },
