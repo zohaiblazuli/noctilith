@@ -12,6 +12,7 @@ All plan tasks built, reviewed and merged into `main`. Public repo: https://gith
 - Wide view (2026-11-14): Go opens a whole SPHEREx frame north-up (`server/overview.py`, `web/wide.js`); zoom keeps full quality; "Play this area over time" loads the yellow box as the flipbook. First build ~18 s, then cached in `cache/overview/`.
 - Research pass (2026-11-14): ghost/streak/bloom/snowball/halo pixels now bad for analysis; "One image per visit" stacking (WiseView-style); deep-survey collections added, sampled to `frame_budget` 720 (120 days); frame lists reused 12 h (`sia_ttl_hours`). New demo spot: NEP deep field.
 - Wide view plays over time (2026-11-14): ▶ animates ~1° around screen centre, one frame per visit on the wide grid (`server/visits.py`); ~30 s for M31's 34 visits. Play tab renamed Detail. Andromeda demo spot opens the wide view.
+- Junk pixels (2026-11-14): `server/junk.py` paints NASA-flagged TRANSIENT/SUR_ERROR/NONFUNC/MISSING_DATA/HOT/COLD (not OVERFLOW/OUTLIER) on the detector before reprojection; toggle in the mode bar (URL `raw=1`). Black level lowered to ~3 sigma below sky (black pixels 9.9% -> 2.0%).
 - Overlays: rings only drawn on real pixels; max 150 brightest stars; "known star (Gaia)" toggle; no-data area drawn dark, not red.
 
 ## Next

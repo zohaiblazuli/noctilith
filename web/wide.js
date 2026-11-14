@@ -57,7 +57,7 @@ async function openWide(ra, dec) {
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
     const info = await r.json();
     const img = new Image();
-    img.src = info.png;
+    img.src = info.png + rawSuffix();
     await img.decode();
     if (my !== token) return;
     state.wide.info = info;
@@ -193,7 +193,7 @@ async function loadAnim(center) {
       const i = next++, v = anim.list[i];
       try {
         const im = new Image();
-        im.src = v.png;
+        im.src = v.png + rawSuffix();
         await im.decode();
         if (my !== anim.token) return;
         anim.imgs.set(v.id, im);
@@ -238,6 +238,30 @@ async function toggleAnim() {
   anim.timer = setTimeout(tick, 300);
 }
 $("wideAnim").addEventListener("click", toggleAnim);
+
+const rawSuffix = () => (state.hideJunk ? "" : "&raw=1");
+
+// "Hide NASA-flagged junk pixels" changed: swap the wide image and every loaded visit image
+on("onJunkChange", async () => {
+  const info = state.wide?.info;
+  if (!info) return;
+  const img = new Image();
+  img.src = info.png + rawSuffix();
+  try { await img.decode(); } catch { return; }
+  if (state.wide?.info !== info) return;
+  wideViewer.setImage(img, info.n);
+  const my = anim.token;
+  for (const [i, v] of anim.list.entries()) {
+    if (!anim.imgs.has(v.id)) continue;
+    const im = new Image();
+    im.src = v.png + rawSuffix();
+    im.decode().then(() => {
+      if (my !== anim.token) return;
+      anim.imgs.set(v.id, im);
+      if (i === anim.idx) wideViewer.setLayer(im, anim.win);
+    }).catch(() => {});
+  }
+});
 
 // Speed: the wide view has its own slider, kept in step with Detail's (the timer reads #speed
 // on every tick, so changes apply while playing).

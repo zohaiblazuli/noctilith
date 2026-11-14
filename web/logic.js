@@ -41,6 +41,20 @@ export function decodeF32(b64) {
   return new Float32Array(u8.buffer);
 }
 
+export function decodeI32(b64) {
+  const bin = atob(b64);
+  const u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return new Int32Array(u8.buffer);
+}
+
+// NASA's original values put back over the junk-filled image (for "Hide NASA-flagged junk" off).
+export function withRawPatch(clean, idx, val) {
+  const out = Float32Array.from(clean);
+  for (let i = 0; i < idx.length; i++) out[idx[i]] = val[i];
+  return out;
+}
+
 export function decodeU8(b64) {
   const bin = atob(b64);
   const u8 = new Uint8Array(bin.length);
@@ -65,7 +79,8 @@ export function stretch(img, bad) {
   // Top of the range = a near-brightest pixel, so galaxy cores and bright stars roll off
   // instead of clipping; `soft` is where the asinh curve starts compressing (~noise level).
   const p998 = good[Math.min(good.length - 1, Math.floor(good.length * 0.998))];
-  return { lo: med - 2 * mad, hi: Math.max(med + 20 * mad, p998), soft: 3 * mad };
+  // lo ~3 sigma below the sky (MAD ~ 0.67 sigma), so ordinary noise dips don't show as pure-black specks
+  return { lo: med - 4.5 * mad, hi: Math.max(med + 20 * mad, p998), soft: 3 * mad };
 }
 
 export function wavelengthColor(um) {

@@ -235,3 +235,12 @@ test("stackPayloads is a noise-weighted mean that skips bad pixels", () => {
   assert.equal(s.badArr[3], 1);                        // bad everywhere stays bad...
   assert.equal(s.img[3], 8);                           // ...but still drawn (plain mean)
 });
+
+import { withRawPatch } from "./logic.js";
+
+test("withRawPatch restores NASA's original values without touching the clean image", () => {
+  const clean = Float32Array.from([1, 2, 3, 4]);
+  const raw = withRawPatch(clean, Int32Array.from([1, 3]), Float32Array.from([900, -50]));
+  assert.deepEqual([...raw], [1, 900, 3, -50]);
+  assert.deepEqual([...clean], [1, 2, 3, 4]);
+});

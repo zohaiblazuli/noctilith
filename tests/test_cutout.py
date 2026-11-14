@@ -102,3 +102,15 @@ def test_retry_budget_is_short():
         asyncio.run(run())
     assert calls["n"] == 3
     assert cutout.TIMEOUT_S <= 25
+
+
+def test_payload_carries_raw_values_of_filled_junk_pixels():
+    import base64
+    import numpy as np
+    from server.cutout import process_cutout
+    p = process_cutout((FIX / "cutout_small.fits").read_bytes(), 150.0, 2.2, 0.03)
+    idx = np.frombuffer(base64.b64decode(p["raw_idx"]), "<i4")
+    val = np.frombuffer(base64.b64decode(p["raw_val"]), "<f4")
+    img = np.frombuffer(base64.b64decode(p["image"]), "<f4")
+    assert len(idx) == len(val) > 0          # the fixture has NASA-flagged junk in view
+    assert np.all(val != img[idx])           # patch holds the original (unfilled) values

@@ -1,4 +1,4 @@
-import { parseRA, parseDec, decodeF32, decodeU8, stretch, wavelengthColor, orderLoad, endOfLoadMessage, visitGroups, stackPayloads } from "./logic.js";
+import { parseRA, parseDec, decodeF32, decodeI32, withRawPatch, decodeU8, stretch, wavelengthColor, orderLoad, endOfLoadMessage, visitGroups, stackPayloads } from "./logic.js";
 import { Viewer } from "./viewer.js";
 
 const $ = (id) => document.getElementById(id);
@@ -17,11 +17,12 @@ export const state = {
   detector: "all",
   token: 0,            // bumps on every new target, cancels stale loads
   stack: false,        // "one image per visit": play combined visit images instead of single frames
+  hideJunk: true,      // paint over pixels NASA flags as junk (cosmic rays, dead/hot/cold pixels)
   stackFrames: [],     // synthetic frames for the visit images (see refreshStacks)
 };
 const stackCache = new Map(); // visit id -> {sig, p}: rebuilt only when its set of ready frames changes
 
-const hooks = { onFrameShown: [], onTargetLoaded: [], onModeChange: [], onWideRequest: [] };
+const hooks = { onFrameShown: [], onTargetLoaded: [], onModeChange: [], onWideRequest: [], onJunkChange: [] };
 export const on = (name, fn) => hooks[name].push(fn);
 export const emit = (name, ...a) => hooks[name].forEach((fn) => fn(...a));
 
@@ -47,6 +48,7 @@ function syncUrl() {
     p.set("ra", String(+state.wide.ra.toFixed(5)));
     p.set("dec", String(+state.wide.dec.toFixed(5)));
     p.set("mode", "wide");
+    if (!state.hideJunk) p.set("raw", "1");
     history.replaceState(null, "", `${location.pathname}?${p}`);
     return;
   }
@@ -58,6 +60,7 @@ function syncUrl() {
   }
   if (state.mode !== "play") p.set("mode", state.mode);
   if (state.stack) p.set("stack", "1");
+  if (!state.hideJunk) p.set("raw", "1");
   if (state.current) p.set("frame", state.current);
   history.replaceState(null, "", `${location.pathname}?${p}`);
 }
@@ -154,7 +157,10 @@ async function loadFrame(id, token, wantFrame) {
     const p = await r.json();
     if (token !== state.token) return;
     const img = decodeF32(p.image), bad = decodeU8(p.bad);
-    state.payloads.set(id, { ...p, img, sig: decodeF32(p.sigma), badArr: bad, scale: stretch(img, bad) });
+    const entry = { ...p, img, imgClean: img, sig: decodeF32(p.sigma), badArr: bad, scale: stretch(img, bad),
+                    rawIdx: p.raw_idx ? decodeI32(p.raw_idx) : null, rawVal: p.raw_val ? decodeF32(p.raw_val) : null };
+    applyJunk(entry);
+    state.payloads.set(id, entry);
     state.status.set(id, "ready");
     setTile(id, "ready");
     if (state.stack) {
@@ -251,6 +257,25 @@ function applyDetectorFilter() {
 }
 
 // ---------- showing frames ----------
+// ---------- NASA-flagged junk pixels ----------
+// The server sends frames with junk already painted over, plus the original values as a patch.
+// Analysis never uses those pixels either way (they are in the bad mask), so swapping is display-only.
+function applyJunk(p) {
+  if (!p.rawIdx || !p.rawIdx.length) return;
+  if (state.hideJunk) p.img = p.imgClean;
+  else p.img = p.imgRaw ||= withRawPatch(p.imgClean, p.rawIdx, p.rawVal);
+}
+
+export function setHideJunk(on) {
+  state.hideJunk = on;
+  $("hideJunk").checked = on;
+  state.payloads.forEach((p) => applyJunk(p));
+  stackCache.clear();
+  if (state.current && frameById(state.current)) showFrame(state.stack ? (playable(), state.current) : state.current);
+  syncUrl();
+  emit("onJunkChange");
+}
+
 // ---------- one image per visit ----------
 const isoFromMjd = (mjd) => new Date((mjd - 40587) * 86400000).toISOString().slice(0, 19);
 
@@ -408,6 +433,8 @@ fetch("demo-spots.json", { cache: "no-cache" }).then((r) => r.json()).then((spot
 const q = new URLSearchParams(location.search);
 export const initialMode = q.get("mode") === "compare" ? "compare" : "play";
 if (q.get("stack") === "1") { state.stack = true; $("stackVisits").checked = true; }
+if (q.get("raw") === "1") { state.hideJunk = false; $("hideJunk").checked = false; }
+$("hideJunk").addEventListener("change", () => setHideJunk($("hideJunk").checked));
 if (q.get("ra") && q.get("dec")) {
   const ra = parseRA(q.get("ra")), dec = parseDec(q.get("dec"));
   const fov = [0.05, 0.1, 0.2, 0.5].includes(+q.get("fov")) ? +q.get("fov") : 0.1;

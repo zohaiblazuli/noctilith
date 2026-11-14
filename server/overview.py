@@ -18,6 +18,7 @@ from reproject import reproject_interp
 
 from server import cache, slicer
 from server.config import SETTINGS
+from server.junk import fill_junk
 
 PREFERRED_DETECTORS = (1, 2)  # shortest wavelengths: sharpest stars, darkest sky
 TIMEOUT_S = 180
@@ -57,7 +58,7 @@ def stretch_u8(img: np.ndarray) -> np.ndarray:
     sigma = 1.4826 * float(np.median(np.abs(d - np.median(d)))) / np.sqrt(2) if d.size else 0.0
     if not sigma > 0:
         sigma = float(sample.max() - sample.min()) / 40 or 1.0
-    lo = float(np.percentile(sample, 2))
+    lo = float(np.percentile(sample, 2)) - sigma  # ~3 sigma below the sky: noise dips don't turn pure black
     hi = max(lo + 20 * sigma, float(np.percentile(sample, 99.8)))
     soft = 3 * sigma
     t = np.arcsinh(np.clip(np.nan_to_num(img, nan=lo) - lo, 0, None) / soft) / np.arcsinh((hi - lo) / soft)
@@ -109,6 +110,7 @@ async def _download_image(client: httpx.AsyncClient, access_url: str):
     if not url:
         raise OverviewError("frame is not on the public mirror")
     lay = await slicer.read_layout(client, url)
+    flags_task = asyncio.create_task(_download_flags(client, url, lay))
     hdr, off, nbytes = lay["IMAGE"]
     r = await client.get(url, headers={"Range": f"bytes={off}-{off + nbytes - 1}"}, timeout=TIMEOUT_S)
     if r.status_code not in (200, 206):
@@ -117,7 +119,7 @@ async def _download_image(client: httpx.AsyncClient, access_url: str):
     if len(raw) != nbytes:
         raise OverviewError("short read")
     img = np.frombuffer(raw, ">f4").reshape(hdr["NAXIS2"], hdr["NAXIS1"]).astype(np.float32)
-    return img, hdr
+    return img, hdr, await flags_task
 
 
 def cached_info(frame_id: str) -> dict | None:
@@ -126,19 +128,37 @@ def cached_info(frame_id: str) -> dict | None:
     return cache.get_json(k) if path.exists() else None
 
 
-def png_path(frame_id: str):
-    k = cache.key("overview-v1", frame_id)
-    return SETTINGS.cache_dir / "overview" / f"{k}.png", k
+def png_path(frame_id: str, raw: bool = False):
+    """(png path, info cache key). raw=True is the version with NASA-flagged junk left in."""
+    k = cache.key("overview-v2", frame_id)
+    return SETTINGS.cache_dir / "overview" / f"{k}{'-raw' if raw else ''}.png", k
+
+
+async def _download_flags(client, url, lay):
+    """Whole FLAGS layer (tile-compressed in DR1), or None if it can't be read (then no junk fill)."""
+    h, off, nbytes = lay["FLAGS"]
+    try:
+        if h.get("ZIMAGE"):
+            data, _ = await slicer._compressed_rows(client, url, h, off, 0, h["ZNAXIS2"])
+            return data
+        r = await client.get(url, headers={"Range": f"bytes={off}-{off + nbytes - 1}"}, timeout=TIMEOUT_S)
+        dt = {32: ">i4", 16: ">i2", 8: "u1"}[h["BITPIX"]]
+        return np.frombuffer(r.content, dt).reshape(h["NAXIS2"], h["NAXIS1"])
+    except Exception:  # flags are a nicety for display; never block the wide view on them
+        return None
 
 
 async def _build(client, meta) -> dict:
     path, k = png_path(meta.id)
-    img, hdr = await _download_image(client, meta.access_url)
-    png, info = await asyncio.to_thread(render, img, hdr)
+    img, hdr, flags = await _download_image(client, meta.access_url)
+    clean = img if flags is None else fill_junk(img, flags)
+    (png, info), (png_raw, _) = await asyncio.gather(asyncio.to_thread(render, clean, hdr),
+                                                     asyncio.to_thread(render, img, hdr))
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_bytes(png)
-    tmp.replace(path)
+    for pth, data in ((png_path(meta.id, raw=True)[0], png_raw), (path, png)):  # clean last: marks "done"
+        tmp = pth.with_suffix(".tmp")
+        tmp.write_bytes(data)
+        tmp.replace(pth)
     info.update(id=meta.id, iso=meta.iso, detector=meta.detector,
                 wavelength_um=(meta.band_um[0] + meta.band_um[1]) / 2)
     cache.put_json(k, info)

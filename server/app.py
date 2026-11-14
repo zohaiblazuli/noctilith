@@ -102,8 +102,8 @@ async def api_overview(ra: float = RA, dec: float = DEC):
 
 
 @app.get("/api/overview.png")
-async def api_overview_png(id: str):
-    path, _ = png_path(id)  # hashed name, so id can't escape the cache folder
+async def api_overview_png(id: str, raw: bool = False):
+    path, _ = png_path(id, raw)  # hashed name, so id can't escape the cache folder
     if not path.exists():
         raise HTTPException(404, "not built yet")
     return FileResponse(path, media_type="image/png", headers={"Cache-Control": "max-age=86400"})
@@ -135,7 +135,7 @@ async def api_visits(wide: str, ra: float = RA, dec: float = DEC, size: float = 
 
 
 @app.get("/api/visit.png")
-async def api_visit_png(id: str, wide: str, ra: float = RA, dec: float = DEC, size: float = SIZE):
+async def api_visit_png(id: str, wide: str, ra: float = RA, dec: float = DEC, size: float = SIZE, raw: bool = False):
     info = _wide_info(wide)
     table = app.state.frames.get(_tkey(ra, dec))
     if table is None:  # server restarted since the list was fetched
@@ -148,7 +148,7 @@ async def api_visit_png(id: str, wide: str, ra: float = RA, dec: float = DEC, si
     if meta is None:
         raise HTTPException(404, "unknown frame")
     try:
-        path = await get_visit_png(app.state.client, meta, info, ra, dec, size, app.state.sem)
+        path = await get_visit_png(app.state.client, meta, info, ra, dec, size, app.state.sem, raw)
     except VisitError:
         raise HTTPException(404, "no coverage")
     except (httpx.HTTPError, SliceError):

@@ -14,6 +14,7 @@ from reproject import reproject_interp
 
 from server import cache
 from server.grid import make_grid_wcs, sky_to_pixel
+from server.junk import fill_junk
 
 log = logging.getLogger(__name__)
 
@@ -67,7 +68,11 @@ def process_cutout(fits_bytes, ra: float, dec: float, fov: float) -> dict | None
         sky = WCS(hdr)
         grid, n = make_grid_wcs(ra, dec, fov)
 
-        img, foot = reproject_interp((hdul["IMAGE"].data.astype(float), sky), grid, shape_out=(n, n))
+        # NASA-flagged junk is painted over on the detector, before reprojection smears it around;
+        # the raw values travel along as a small patch so the page can show them on request
+        raw_det = hdul["IMAGE"].data.astype(float)
+        img, foot = reproject_interp((fill_junk(raw_det, hdul["FLAGS"].data), sky), grid, shape_out=(n, n))
+        raw, _ = reproject_interp((raw_det, sky), grid, shape_out=(n, n))
         var, _ = reproject_interp((hdul["VARIANCE"].data.astype(float), sky), grid, shape_out=(n, n))
         flags, _ = reproject_interp((hdul["FLAGS"].data.astype(float), sky), grid, shape_out=(n, n), order=0)
 
@@ -84,7 +89,9 @@ def process_cutout(fits_bytes, ra: float, dec: float, fov: float) -> dict | None
 
     flags_i = np.nan_to_num(flags, nan=0).astype(np.int64)
     bad = (~np.isfinite(img)) | ((flags_i & BAD_MASK) != 0)
-    img = img - np.nanmedian(img[~bad]) if (~bad).any() else img
+    bg = float(np.nanmedian(img[~bad])) if (~bad).any() else 0.0
+    img, raw = img - bg, raw - bg
+    raw_idx = np.flatnonzero(np.isfinite(raw) & np.isfinite(img) & (raw != img))
     sigma = np.sqrt(np.clip(var, 0, None))
 
     return {
@@ -94,13 +101,15 @@ def process_cutout(fits_bytes, ra: float, dec: float, fov: float) -> dict | None
         "image": _b64(img, "<f4"),
         "sigma": _b64(sigma, "<f4"),
         "bad": _b64(bad, "u1"),
+        "raw_idx": _b64(raw_idx, "<i4"),
+        "raw_val": _b64(raw.ravel()[raw_idx], "<f4"),
         "coverage": coverage,
     }
 
 
 async def get_frame(client: httpx.AsyncClient, meta, ra: float, dec: float, fov: float,
                     sem: asyncio.Semaphore) -> dict | None:
-    k = cache.key("frame-v3", meta.id, round(ra, 5), round(dec, 5), fov)
+    k = cache.key("frame-v4", meta.id, round(ra, 5), round(dec, 5), fov)
     hit = cache.get_json(k)
     if hit is not None:
         return hit.get("payload")

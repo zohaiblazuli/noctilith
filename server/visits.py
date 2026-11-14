@@ -18,6 +18,7 @@ from reproject import reproject_interp
 
 from server import cache, slicer
 from server.config import SETTINGS
+from server.junk import fill_junk
 from server.overview import PREFERRED_DETECTORS, _sep_deg, stretch_u8
 
 VISIT_GAP_D = 0.5   # must match web/logic.js visitGroups
@@ -92,9 +93,9 @@ def render_window(img: np.ndarray, sky: WCS, info: dict, x0: int, y0: int, m: in
     return png.getvalue()
 
 
-def png_path(frame_id: str, info: dict, x0: int, y0: int, m: int):
-    k = cache.key("visit-v1", frame_id, round(info["ra0"], 6), round(info["dec0"], 6), info["n"], x0, y0, m)
-    return SETTINGS.cache_dir / "visits" / f"{k}.png"
+def png_path(frame_id: str, info: dict, x0: int, y0: int, m: int, raw: bool = False):
+    k = cache.key("visit-v2", frame_id, round(info["ra0"], 6), round(info["dec0"], 6), info["n"], x0, y0, m)
+    return SETTINGS.cache_dir / "visits" / f"{k}{'-raw' if raw else ''}.png"
 
 
 async def _fetch_rows(client, meta, ra, dec, size_deg):
@@ -105,7 +106,7 @@ async def _fetch_rows(client, meta, ra, dec, size_deg):
     hdr, off, _ = lay["IMAGE"]
     box = slicer._bbox(hdr, ra, dec, size_deg)
     if box is None:
-        return None, None
+        return None, None, None
     x0, x1, y0, y1 = box
     width = hdr["NAXIS1"]
     start, nbytes = off + y0 * width * 4, (y1 - y0) * width * 4
@@ -116,37 +117,45 @@ async def _fetch_rows(client, meta, ra, dec, size_deg):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", AstropyWarning)
         sky = WCS(slicer._shift(hdr, x0, y0, x1 - x0, y1 - y0)).celestial
-    return rows, sky
+    fh, foff, _ = lay["FLAGS"]
+    try:  # NASA's quality flags for the same rows (tile-compressed in DR1)
+        flags, _ = await slicer._compressed_rows(client, url, fh, foff, y0, y1) if fh.get("ZIMAGE") else (None, None)
+        clean = rows if flags is None else fill_junk(rows, flags[:, x0:x1])
+    except Exception:  # display nicety only; never block a visit on it
+        clean = rows
+    return clean, rows, sky
 
 
 async def _build(client, meta, info, ra, dec, size_deg, window, sem):
     x0, y0, m = window
-    path = png_path(meta.id, info, x0, y0, m)
     async with sem:
-        rows, sky = await _fetch_rows(client, meta, ra, dec, size_deg)
-    if rows is None:
+        clean, raw, sky = await _fetch_rows(client, meta, ra, dec, size_deg)
+    if clean is None:
         raise VisitError("frame does not reach this area")
-    png = await asyncio.to_thread(render_window, rows, sky, info, x0, y0, m)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_bytes(png)
-    tmp.replace(path)
-    return path
+    pngs = await asyncio.gather(asyncio.to_thread(render_window, raw, sky, info, x0, y0, m),
+                                asyncio.to_thread(render_window, clean, sky, info, x0, y0, m))
+    for is_raw, data in zip((True, False), pngs):  # clean last: its file marks the pair as done
+        pth = png_path(meta.id, info, x0, y0, m, raw=is_raw)
+        pth.parent.mkdir(parents=True, exist_ok=True)
+        tmp = pth.with_suffix(".tmp")
+        tmp.write_bytes(data)
+        tmp.replace(pth)
 
 
 async def get_visit_png(client: httpx.AsyncClient, meta, info: dict, ra: float, dec: float,
-                        size_deg: float, sem: asyncio.Semaphore):
-    """Path to the cached PNG of one visit's frame on the wide-grid window around ra/dec."""
+                        size_deg: float, sem: asyncio.Semaphore, raw: bool = False):
+    """Path to the cached PNG of one visit's frame on the wide-grid window around ra/dec
+    (raw=True: NASA-flagged junk left in). Both versions are built together."""
     window = window_for(info, ra, dec, size_deg)
-    path = png_path(meta.id, info, *window)
-    if path.exists():
-        return path
-    key = str(path)
-    task = _inflight.get(key)
-    if task is None:
-        task = _inflight[key] = asyncio.create_task(_build(client, meta, info, ra, dec, size_deg, window, sem))
-        task.add_done_callback(lambda _t: _inflight.pop(key, None))
-    return await task
+    done = png_path(meta.id, info, *window)
+    if not done.exists():
+        key = str(done)
+        task = _inflight.get(key)
+        if task is None:
+            task = _inflight[key] = asyncio.create_task(_build(client, meta, info, ra, dec, size_deg, window, sem))
+            task.add_done_callback(lambda _t: _inflight.pop(key, None))
+        await task
+    return png_path(meta.id, info, *window, raw=raw)
 
 
 def visit_size_ok(size_deg: float) -> bool:
