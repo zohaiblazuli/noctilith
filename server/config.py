@@ -6,7 +6,7 @@ from pathlib import Path
 
 @dataclass
 class Settings:
-    collection: str = "spherex_qr2"
+    collection: str = "spherex_dr1,spherex_qr3"  # comma-separated IRSA collections, all searched
     cache_dir: Path = field(default_factory=lambda: Path("cache"))
     max_concurrency: int = 12
     pixel_arcsec: float = 6.15

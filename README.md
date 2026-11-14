@@ -104,7 +104,7 @@ Any setting in [`server/config.py`](server/config.py) can be overridden with an 
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `SPHEREX_COLLECTION` | `spherex_qr2` | IRSA data collection (change when a new release comes out) |
+| `SPHEREX_COLLECTION` | `spherex_dr1,spherex_qr3` | Comma-separated IRSA collections to search (add new releases here; old names stop working when IRSA retires them) |
 | `SPHEREX_CACHE_DIR` | `cache` | Where downloaded frames are stored |
 | `SPHEREX_MAX_CONCURRENCY` | `12` | Parallel downloads |
 | `SPHEREX_FOV_DEFAULT` | `0.1` | Default field of view (degrees) |

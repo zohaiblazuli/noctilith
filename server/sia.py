@@ -67,11 +67,9 @@ def assign_bursts(frames: list[FrameMeta], gap_days: float = 10.0) -> list[dict]
 
 
 async def query_frames(client: httpx.AsyncClient, ra: float, dec: float, fov: float) -> list[FrameMeta]:
-    params = {
-        "COLLECTION": SETTINGS.collection,
-        "POS": f"circle {ra} {dec} {SEARCH_RADIUS_DEG}",
-        "RESPONSEFORMAT": "CSV",
-    }
+    # IRSA ORs repeated COLLECTION params, so one request covers every release.
+    params = [("COLLECTION", c.strip()) for c in SETTINGS.collection.split(",") if c.strip()]
+    params += [("POS", f"circle {ra} {dec} {SEARCH_RADIUS_DEG}"), ("RESPONSEFORMAT", "CSV")]
     r = await client.get(SIA_URL, params=params, timeout=60)
     r.raise_for_status()
     return parse_sia_csv(r.text)

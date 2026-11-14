@@ -11,6 +11,7 @@ Checked by running real requests on 2026-11-12 unless marked otherwise. Trust th
 `https://irsa.ipac.caltech.edu/SIA?COLLECTION=spherex_qr2&POS=circle+{ra}+{dec}+{radius_deg}&RESPONSEFORMAT=CSV`
 - Useful columns: `obs_id`, `energy_bandpassname` (SPHEREx-D1..D6), `t_min`/`t_max` (MJD), `access_url`, `em_min`/`em_max` (m), `s_region`, `cloud_access` (S3 key).
 - QR2 supersedes QR1. The collection name will change with future releases, so keep it in config.
+- 2026-11-14: `spherex_qr2` was retired (SIA returns an empty table, no error). Live now: `spherex_dr1` (Jul 2025 to Jan 2026) and `spherex_qr3` (Jul 2026 on). Repeated `COLLECTION=` params are ORed in one request, no duplicate rows. Same CSV columns; files under `.../spherex/dr1/...` and `.../qr3/...`.
 - Coverage: RA 150 / Dec 2.2 → 213 frames over 21 distinct days (Apr 2025 to May 2026). RA 10.68 / Dec 41.27 → 305 frames. RA 270 / Dec 66.56 (north ecliptic pole) → 570 frames over 82 days. Frames arrive in bursts about 6 months apart. D1 and D4 (and so on) are exposed simultaneously.
 - **No CORS headers**, so this can't be called from a browser.
 

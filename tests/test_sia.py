@@ -49,7 +49,7 @@ def test_query_url():
 
     frames = asyncio.run(run())
     q = seen["url"].params
-    assert q["COLLECTION"] == "spherex_qr2"
+    assert q.get_list("COLLECTION") == ["spherex_dr1", "spherex_qr3"]
     assert q["POS"] == "circle 150.0 2.2 0.001"
     assert q["RESPONSEFORMAT"] == "CSV"
     assert len(frames) == 5

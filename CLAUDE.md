@@ -20,7 +20,9 @@ Web tool for the NASA Space Apps hackathon (48 h, started 2026-11-12). The user 
 5. **Batch tool calls** that don't depend on each other. Don't re-read a file you just wrote.
 6. **Tests:** run only the relevant test file while iterating, and the full suite before a commit.
 7. **End of each work chunk:** run `/handoff`. It updates STATUS and DECISIONS and commits. Small, frequent commits.
-8. When the conversation gets long, run `/handoff` and then start a fresh session rather than dragging old context along.
+8. **Debug from the outside in.** If "nothing loads", first `curl` the `/api/...` endpoint and print a one-line summary (counts, status), then query IRSA directly, before reading frontend code. Upstream changes (e.g. a retired collection name) fail silently as empty results.
+9. **Never kill processes broadly** (no `taskkill /IM python.exe`). Start test servers on a spare port and stop them by PID.
+10. When the conversation gets long, run `/handoff` and then start a fresh session rather than dragging old context along.
 
 ## Tech
 Python 3.12 · FastAPI · astropy · reproject · httpx · plain HTML/JS frontend (no build step). Run locally: see STATUS.md once the server exists.
