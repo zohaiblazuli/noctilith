@@ -27,9 +27,10 @@ def test_frames_ok(client):
     r = client.get("/api/frames", params={"ra": 270, "dec": 66.56})
     assert r.status_code == 200
     body = r.json()
-    assert set(body) == {"target", "bursts", "frames"}
+    assert set(body) == {"target", "bursts", "frames", "available"}
     assert body["target"] == {"ra": 270.0, "dec": 66.56, "fov": 0.1, "n": 59}
     assert len(body["frames"]) == 5
+    assert body["available"] == 5  # under the budget, so nothing was sampled away
     assert body["frames"][0]["id"].endswith("D2")
 
 

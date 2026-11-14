@@ -14,7 +14,7 @@ from server.grid import make_grid_wcs
 from server.known import known_sso, known_stars
 from server.overview import OverviewError, get_overview, pick_frame, png_path
 from server.slicer import SliceError
-from server.sia import assign_bursts, cached_query_frames as query_frames
+from server.sia import assign_bursts, cached_query_frames as query_frames, thin_frames
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 
@@ -28,6 +28,7 @@ async def lifespan(app: FastAPI):
     app.state.client = httpx.AsyncClient(follow_redirects=True)
     app.state.sem = asyncio.Semaphore(SETTINGS.max_concurrency)
     app.state.frames = {}  # (ra, dec) -> {id: FrameMeta}
+    app.state.available = {}  # (ra, dec) -> frames that exist before sampling
     yield
     await app.state.client.aclose()
 
@@ -40,9 +41,12 @@ def _tkey(ra, dec):
 
 
 async def _frames_for(ra: float, dec: float, fov: float):
-    frames = await query_frames(app.state.client, ra, dec, fov)
+    """Frames to show for a spot, sampled down to the budget; also returns how many exist."""
+    every = await query_frames(app.state.client, ra, dec, fov)
+    frames = thin_frames(every, SETTINGS.frame_budget)
     bursts = assign_bursts(frames)
     app.state.frames[_tkey(ra, dec)] = {f.id: f for f in frames}
+    app.state.available[_tkey(ra, dec)] = len(every)
     return frames, bursts
 
 
@@ -54,7 +58,8 @@ async def api_frames(ra: float = RA, dec: float = DEC, fov: float = FOV):
         raise HTTPException(502, "IRSA unavailable, try again")
     _, n = make_grid_wcs(ra, dec, fov)
     return {"target": {"ra": ra, "dec": dec, "fov": fov, "n": n},
-            "bursts": bursts, "frames": [f.to_dict() for f in frames]}
+            "bursts": bursts, "frames": [f.to_dict() for f in frames],
+            "available": app.state.available.get(_tkey(ra, dec), len(frames))}
 
 
 @app.get("/api/frame")

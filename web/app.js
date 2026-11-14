@@ -101,6 +101,10 @@ export async function loadTarget(ra, dec, fov, wantFrame = null, focusMjd = null
   state.target = body.target;
   state.frames = body.frames;
   state.bursts = body.bursts;
+  if (body.available > body.frames.length && !$("loadStatus").dataset.note) {
+    $("loadStatus").dataset.note =
+      `SPHEREx took ${body.available.toLocaleString()} images here (deep survey); showing an even sample of ${body.frames.length}`;
+  }
   syncUrl();
 
   if (!state.frames.length) {
@@ -153,7 +157,15 @@ async function loadFrame(id, token, wantFrame) {
     state.payloads.set(id, { ...p, img, sig: decodeF32(p.sigma), badArr: bad, scale: stretch(img, bad) });
     state.status.set(id, "ready");
     setTile(id, "ready");
-    if (!state.current || id === wantFrame) showFrame(id);
+    if (state.stack) {
+      // visit mode: open on the first visit image, and redraw the shown visit as its frames arrive
+      const cur = frameById(state.current);
+      if (!state.current || id === wantFrame || cur?.stack) {
+        refreshStacks();
+        const v = state.stackFrames.find((s) => s.members.includes(id));
+        if (v && (!state.current || id === wantFrame || (cur?.stack && cur.id === v.id && !state.playing))) showFrame(v.id);
+      }
+    } else if (!state.current || id === wantFrame) showFrame(id);
   } catch {
     if (token !== state.token) return;
     state.status.set(id, "failed");
@@ -384,6 +396,7 @@ fetch("demo-spots.json").then((r) => r.json()).then((spots) => {
     const s = spots[+sel.value];
     if (!s) return;
     $("ra").value = s.ra; $("dec").value = s.dec; $("fov").value = String(s.fov);
+    if (s.stack) { state.stack = true; $("stackVisits").checked = true; }
     loadTarget(s.ra, s.dec, s.fov, null, s.mjd ?? null);
     sel.value = "";
     if (s.note) $("loadStatus").dataset.note = s.note;

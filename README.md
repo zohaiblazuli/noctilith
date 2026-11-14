@@ -28,6 +28,8 @@ Type a position on the sky (Right Ascension and Declination) and this tool plays
 
 ## Features
 - **Wide view**: entering a position first shows one whole SPHEREx image (~3.5° across), north-up. Scroll to zoom right down to single pixels without losing quality, drag to move, then press **Play this area over time** to load the yellow-boxed area from every frame.
+- **One image per visit** (WiseView-style): a checkbox combines each visit's frames into one sharper image (noise drops ~3-4x) and plays visits in order. Best for slow movers; single frames are best for fast asteroids.
+- **Deep survey**: SPHEREx's deep fields near the ecliptic poles (about 29,000 images at the north pole) are included, sampled evenly to 120 days so they load in minutes.
 - **Play mode**: step through every SPHEREx frame of a spot. The timeline is coloured by the infrared wavelength each frame saw and grouped into visits.
 - **Compare mode**: before / after / difference panels. Frames are paired at the same wavelength, so differences are real changes rather than colour effects. Red means brighter now; blue means brighter before.
 - **"Is it known?" overlays**:
@@ -107,7 +109,7 @@ Any setting in [`server/config.py`](server/config.py) can be overridden with an 
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `SPHEREX_COLLECTION` | `spherex_dr1,spherex_qr3` | Comma-separated IRSA collections to search (add new releases here; old names stop working when IRSA retires them) |
+| `SPHEREX_COLLECTION` | `spherex_dr1,spherex_qr3,spherex_dr1_deep,spherex_qr3_deep` | Comma-separated IRSA collections to search (add new releases here; old names stop working when IRSA retires them) |
 | `SPHEREX_CACHE_DIR` | `cache` | Where downloaded frames are stored |
 | `SPHEREX_MAX_CONCURRENCY` | `12` | Parallel downloads |
 | `SPHEREX_FOV_DEFAULT` | `0.1` | Default field of view (degrees) |

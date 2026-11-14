@@ -6,7 +6,9 @@ from pathlib import Path
 
 @dataclass
 class Settings:
-    collection: str = "spherex_dr1,spherex_qr3"  # comma-separated IRSA collections, all searched
+    collection: str = "spherex_dr1,spherex_qr3,spherex_dr1_deep,spherex_qr3_deep"  # comma-separated, all searched
+    sia_ttl_hours: float = 12.0  # reuse a spot's frame list this long (deep fields are 27 MB to re-query)
+    frame_budget: int = 720  # max frames per spot; deep-survey spots are sampled evenly down to this
     cache_dir: Path = field(default_factory=lambda: Path("cache"))
     max_concurrency: int = 12
     pixel_arcsec: float = 6.15

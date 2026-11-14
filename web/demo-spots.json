@@ -18,5 +18,10 @@
     "label": "Quiet deep field (COSMOS)",
     "ra": 150.0, "dec": 2.2, "fov": 0.1,
     "note": "A famous deep-survey field with about 200 SPHEREx frames. Good for spectra and for seeing what 'nothing changed' looks like."
+  },
+  {
+    "label": "SPHEREx deep field at the North Ecliptic Pole (18 months)",
+    "ra": 270.0, "dec": 66.56, "fov": 0.1, "stack": true,
+    "note": "SPHEREx photographs this spot almost every day: about 29,000 images. We show one combined image for each of 120 days spread over 18 months."
   }
 ]

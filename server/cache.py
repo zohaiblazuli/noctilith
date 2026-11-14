@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 import tempfile
+import time
 
 from server.config import SETTINGS
 
@@ -30,3 +31,11 @@ def put_json(k: str, obj) -> None:
     with os.fdopen(fd, "w") as f:
         json.dump(obj, f)
     os.replace(tmp, p)
+
+
+def age_s(k: str) -> float | None:
+    """Seconds since the entry was written, or None if missing."""
+    try:
+        return time.time() - _path(k).stat().st_mtime
+    except FileNotFoundError:
+        return None
