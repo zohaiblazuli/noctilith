@@ -17,9 +17,11 @@ from server.grid import make_grid_wcs, sky_to_pixel
 
 log = logging.getLogger(__name__)
 
-# FLAGS bits (from the FLAGS header) that make a pixel unusable. Source-mask (21),
-# dichroic (7), full-sample (12) and phantom-not-applied (14) are informational.
-BAD_BITS = (0, 1, 2, 4, 5, 6, 9, 10, 11, 15, 17, 19)
+# FLAGS bits (from the FLAGS header) that make a pixel unusable for analysis (it is still drawn).
+# 22-28 = GHOST, GHOST_FPA, GHOST_EXT, STREAK, BLOOM, SNOWBALL, HALO (as IRSA's notebooks do).
+# Informational: dichroic (7), full-sample (12), phantom-not-applied (14), SOURCE (21), and
+# CROSSTALK (20), which blankets ~70% of pixels near bright objects like M31's core.
+BAD_BITS = (0, 1, 2, 4, 5, 6, 9, 10, 11, 15, 17, 19, 22, 23, 24, 25, 26, 27, 28)
 BAD_MASK = sum(1 << b for b in BAD_BITS)
 MIN_COVERAGE = 0.5
 BACKOFF_S = (2, 4)  # 3 attempts: a dead IRSA greys a tile in ~1 min, not ~5
@@ -98,7 +100,7 @@ def process_cutout(fits_bytes, ra: float, dec: float, fov: float) -> dict | None
 
 async def get_frame(client: httpx.AsyncClient, meta, ra: float, dec: float, fov: float,
                     sem: asyncio.Semaphore) -> dict | None:
-    k = cache.key("frame-v2", meta.id, round(ra, 5), round(dec, 5), fov)
+    k = cache.key("frame-v3", meta.id, round(ra, 5), round(dec, 5), fov)
     hit = cache.get_json(k)
     if hit is not None:
         return hit.get("payload")
