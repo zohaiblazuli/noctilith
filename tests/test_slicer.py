@@ -63,6 +63,39 @@ def test_slice_matches_cutout_path():
     assert p["bad"] == ref["bad"]
 
 
+def _with_compressed_flags() -> bytes:
+    """The fixture rewritten the way DR1 ships it: FLAGS as a RICE tile-compressed HDU, one tile per row."""
+    import io
+    src = fits.open(io.BytesIO(FITS_BYTES))
+    hdus = []
+    for h in src:
+        if h.name == "FLAGS":
+            hdr = h.header.copy()
+            for k in ("XTENSION", "BITPIX", "NAXIS", "NAXIS1", "NAXIS2", "PCOUNT", "GCOUNT", "EXTNAME"):
+                hdr.remove(k, ignore_missing=True)
+            hdus.append(fits.CompImageHDU(h.data, header=hdr, name="FLAGS", compression_type="RICE_1",
+                                          tile_shape=(1, h.data.shape[1])))
+        else:
+            hdus.append(h)
+    out = io.BytesIO()
+    fits.HDUList(hdus).writeto(out)
+    return out.getvalue()
+
+
+def test_slice_reads_compressed_flags():
+    blob = _with_compressed_flags()
+    assert b"ZIMAGE  =                    T" in blob  # really compressed on disk
+
+    async def run():
+        async with _range_client(blob) as c:
+            return await slice_payload(c, "https://x/f.fits", 150.0, 2.2, 0.03, asyncio.Semaphore(4))
+    p = asyncio.run(run())
+    ref = process_cutout(FITS_BYTES, 150.0, 2.2, 0.03)
+    assert np.frombuffer(base64.b64decode(ref["bad"]), "u1").any()  # the test means something
+    assert p["bad"] == ref["bad"]
+    np.testing.assert_allclose(_f32(p["image"]), _f32(ref["image"]), rtol=1e-5, atol=1e-6, equal_nan=True)
+
+
 def test_slice_outside_detector_is_none():
     async def run():
         async with _range_client(FITS_BYTES) as c:

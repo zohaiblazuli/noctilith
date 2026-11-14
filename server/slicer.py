@@ -6,6 +6,7 @@ NASA's public AWS bucket; reading only the rows we need is ~3x fewer bytes and n
 The result goes through the same process_cutout() as a normal cutout.
 """
 import asyncio
+import io
 import logging
 import warnings
 
@@ -110,6 +111,35 @@ def _bbox(img_hdr, ra, dec, fov):
     return None if x1 <= x0 or y1 <= y0 else (x0, x1, y0, y1)
 
 
+async def _compressed_rows(client, url, h: fits.Header, off: int, y0: int, y1: int):
+    """Rows y0..y1 of a tile-compressed image HDU (DR1 ships FLAGS this way: RICE, one tile per row).
+
+    Reads only those rows' tile pointers and their part of the heap, wraps them in a small
+    FITS file and lets astropy decompress it. Returns (data, image-style header).
+    """
+    if (h.get("TFIELDS") != 1 or not str(h.get("TFORM1", "")).startswith("1P")
+            or h.get("ZTILE2", 1) != 1 or h.get("ZTILE1") != h["ZNAXIS1"]):
+        raise SliceError("unsupported compressed layout")  # caller falls back to IRSA cutout
+    ny, rowlen = y1 - y0, h["NAXIS1"]
+    desc = np.frombuffer(await _range(client, url, off + y0 * rowlen, ny * rowlen), ">i4").reshape(ny, 2)
+    count, start = desc[:, 0].astype(np.int64), desc[:, 1].astype(np.int64)
+    lo, hi = int(start.min()), int((start + count).max())
+    theap = h.get("THEAP", rowlen * h["NAXIS2"])
+    heap = await _range(client, url, off + theap + lo, hi - lo)
+
+    hh = h.copy()
+    hh["NAXIS2"], hh["ZNAXIS2"], hh["PCOUNT"] = ny, ny, hi - lo
+    for k in ("THEAP", "CHECKSUM", "DATASUM", "ZHECKSUM", "ZDATASUM"):
+        hh.remove(k, ignore_missing=True)
+    body = np.stack([count, start - lo], axis=1).astype(">i4").tobytes() + heap
+    blob = io.BytesIO()
+    fits.PrimaryHDU().writeto(blob)
+    blob.write(hh.tostring().encode("ascii") + body.ljust(_pad(len(body)), b"\0"))
+    blob.seek(0)
+    with fits.open(blob) as small:
+        return np.array(small[1].data), small[1].header.copy()
+
+
 def _shift(h: fits.Header, x0: int, y0: int, nx: int, ny: int) -> fits.Header:
     h = h.copy()
     for k in list(h.keys()):
@@ -132,16 +162,19 @@ async def slice_hdul(client, url, ra, dec, fov) -> fits.HDUList | None:
 
     async def rows(name):
         h, off, _ = lay[name]
+        if h.get("ZIMAGE"):
+            data, h = await _compressed_rows(client, url, h, off, y0, y1)
+            return data[:, x0:x1], h
         bpp = abs(h["BITPIX"]) // 8
         raw = await _range(client, url, off + y0 * width * bpp, (y1 - y0) * width * bpp)
         dt = {-32: ">f4", -64: ">f8", 32: ">i4", 16: ">i2", 8: "u1"}[h["BITPIX"]]
-        return np.frombuffer(raw, dt).reshape(y1 - y0, width)[:, x0:x1]
+        return np.frombuffer(raw, dt).reshape(y1 - y0, width)[:, x0:x1], h
 
     h, off, nb = lay["WCS-WAVE"]
     *planes, table = await asyncio.gather(*[rows(n) for n in WANTED], _range(client, url, off, nb))
     hdus = [fits.PrimaryHDU(header=lay["PRIMARY"][0] if "PRIMARY" in lay else None)]
-    for name, data in zip(WANTED, planes):
-        hh = _shift(lay[name][0], x0, y0, x1 - x0, y1 - y0)
+    for name, (data, hdr) in zip(WANTED, planes):
+        hh = _shift(hdr, x0, y0, x1 - x0, y1 - y0)
         hdus.append(fits.ImageHDU(data=np.array(data), header=hh, name=name))
     hdus.append(fits.BinTableHDU.fromstring(h.tostring().encode("ascii") + table.ljust(_pad(nb), b"\0")))
     return fits.HDUList(hdus)

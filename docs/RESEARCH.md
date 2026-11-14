@@ -38,3 +38,4 @@ HDUs: `IMAGE` (MJy/sr, float32) · `FLAGS` (int32 bitmask; also marks known-sour
 - Aladin Lite (CDS): embeddable sky viewer with HiPS surveys (2MASS, WISE, Gaia).
 - Full L2 images are mirrored publicly at `https://nasa-irsa-spherex.s3.us-east-1.amazonaws.com/` + the path after `/ibe/data/spherex/`. Uncompressed 2040×2040 float32; HDUs IMAGE, FLAGS, VARIANCE, ZODI, PSF, WCS-WAVE. Range requests work. Cutout CRPIX keys to shift: CRPIX1/2, CRPIX1A/2A, CRPIX1W/2W.
 - This machine's download tops out at ~3 MB/s total (1 conn ~0.4 MB/s, 18 conns ~2.9 MB/s).
+- 2026-11-14: DR1/QR3 files store FLAGS as a RICE tile-compressed BINTABLE (ZIMAGE, one tile per row, 1PB descriptors); IMAGE and VARIANCE stay uncompressed. Mask-plane bit numbers are unchanged from QR2; new informational bits 20-28 (crosstalk, ghosts, streak, bloom, snowball, halo). Bright cores (e.g. M31 nucleus) carry bit 1 OVERFLOW.

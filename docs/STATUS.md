@@ -8,7 +8,7 @@ All plan tasks built, reviewed and merged into `main`. Public repo: https://gith
 - Page: Play mode, timeline, URL sync, overlays, click panel, spectrum, Compare mode with candidate boxes, guide strip, demo spots.
 - README, `run.ps1`, `setup.bat` (makes `.venv` + installs requirements; `start.bat` uses it). Tests: 40 pytest, 21 node.
 - Speed: frames now come from NASA's AWS mirror via byte-range slices (~1.9 frames/s vs ~0.3), with the IRSA cutout as fallback. Concurrency 12.
-- Data release fix (2026-11-14): IRSA retired `spherex_qr2`; now searches `spherex_dr1` (Jul 2025–Jan 2026) + `spherex_qr3` (Jul 2026). Demo spot 1 shows 321 frames over 5 visits.
+- Data release fix (2026-11-14): IRSA retired `spherex_qr2`; now searches `spherex_dr1` (Jul 2025–Jan 2026) + `spherex_qr3` (Jul 2026). Demo spot 1 shows 321 frames over 5 visits. DR1 compresses FLAGS; slicer now decompresses it (fixed random red speckle).
 - Overlays: rings only drawn on real pixels; max 150 brightest stars; "known star (Gaia)" toggle; no-data area drawn dark, not red.
 
 ## Next

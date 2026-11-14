@@ -98,7 +98,7 @@ def process_cutout(fits_bytes, ra: float, dec: float, fov: float) -> dict | None
 
 async def get_frame(client: httpx.AsyncClient, meta, ra: float, dec: float, fov: float,
                     sem: asyncio.Semaphore) -> dict | None:
-    k = cache.key("frame-v1", meta.id, round(ra, 5), round(dec, 5), fov)
+    k = cache.key("frame-v2", meta.id, round(ra, 5), round(dec, 5), fov)
     hit = cache.get_json(k)
     if hit is not None:
         return hit.get("payload")
