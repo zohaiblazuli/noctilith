@@ -75,6 +75,7 @@ button.primary { background: var(--accent); color: #04121c; border-color: var(--
 .view-wide .viewer:active { cursor: grabbing; }
 .wide-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 10px 0; font-size: 13px; }
 .wide-hint { color: var(--muted); }
+.wide-speed { display: flex; align-items: center; gap: 6px; color: var(--muted); }
 .stage.wide .controls, .stage.wide .timeline, .stage.wide .load-status { display: none; }
 .view-compare { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .view-compare figure { margin: 0; }

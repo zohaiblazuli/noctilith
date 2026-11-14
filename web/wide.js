@@ -238,5 +238,14 @@ async function toggleAnim() {
   anim.timer = setTimeout(tick, 300);
 }
 $("wideAnim").addEventListener("click", toggleAnim);
+
+// Speed: the wide view has its own slider, kept in step with Detail's (the timer reads #speed
+// on every tick, so changes apply while playing).
+function syncSpeed(from, to) {
+  $(to).value = $(from).value;
+  $("speedVal").textContent = $("wideSpeedVal").textContent = $(from).value;
+}
+$("wideSpeed").addEventListener("input", () => syncSpeed("wideSpeed", "speed"));
+$("speed").addEventListener("input", () => syncSpeed("speed", "wideSpeed"));
 $("widePrev").addEventListener("click", () => { stopWideAnim(); stepVisit(-1); });
 $("wideNext").addEventListener("click", () => { stopWideAnim(); stepVisit(1); });
