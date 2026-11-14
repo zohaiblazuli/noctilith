@@ -81,6 +81,10 @@ export class Viewer {
     this.draw();
   }
 
+  // An image drawn on top of the base picture at grid window {x0, y0, m} (y-up, same pixel size);
+  // the wide view uses it to play visit images in place. null removes it.
+  setLayer(bitmap, win) { this.layer = bitmap ? { bitmap, ...win } : null; this.draw(); }
+
   // Centre (grid x, y-up) and width (grid px) of what is on screen.
   visibleRegion() {
     const g = this._geom();
@@ -130,6 +134,12 @@ export class Viewer {
       ctx.imageSmoothingEnabled = g.scale < 1;
       ctx.imageSmoothingQuality = "high";
       ctx.drawImage(this.off, g.ox, g.oy, this.n * g.scale, this.n * g.scale);
+      if (this.layer) {
+        const L = this.layer, x = g.ox + L.x0 * g.scale, y = g.oy + (this.n - L.y0 - L.m) * g.scale, s = L.m * g.scale;
+        ctx.drawImage(L.bitmap, x, y, s, s);
+        ctx.strokeStyle = "rgba(125,211,252,0.6)"; ctx.lineWidth = 1 * g.dpr;
+        ctx.setLineDash([6 * g.dpr, 4 * g.dpr]); ctx.strokeRect(x, y, s, s); ctx.setLineDash([]);
+      }
       this._drawOverlays(g);
     }
     if (this.message) {

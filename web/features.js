@@ -3,7 +3,7 @@ import { state, on, mainViewer, frameById, showFrame, stopPlay, syncUrl, initial
 import { ssoAt, pairFor, diffSigma, nearestKnown, PAIR_WARN_UM, spectrumAt, findChanges, isAppearance, isPointLike, onImage, brightest } from "./logic.js";
 import { Viewer } from "./viewer.js";
 import { showSpot, drawSpectrum } from "./panel.js";
-import { initWide, onWideShown, onPlayShown } from "./wide.js";
+import { initWide, onWideShown, onPlayShown, stopWideAnim } from "./wide.js";
 
 const $ = (id) => document.getElementById(id);
 const STAR_GMAX_SHOWN = 15;
@@ -128,6 +128,7 @@ function setMode(mode) {
   $("compareView").hidden = mode !== "compare";
   $("wideView").hidden = mode !== "wide";
   document.querySelector(".stage").classList.toggle("wide", mode === "wide");
+  if (mode !== "wide") stopWideAnim();
   if (mode === "compare") { stopPlay(); renderCompare(); }
   else if (mode === "wide") { stopPlay(); onWideShown(); }
   else { onPlayShown(); refresh(); }

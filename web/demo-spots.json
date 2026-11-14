@@ -1,5 +1,10 @@
 [
   {
+    "label": "Andromeda Galaxy (M31), wide view",
+    "ra": 10.6847, "dec": 41.269, "fov": 0.1, "wide": true,
+    "note": "Our nearest big galaxy, 2.5 million light-years away. Zoom in, then press ▶ Play over time."
+  },
+  {
     "label": "Asteroid Abundantia racing across (Jan 2026)",
     "ra": 18.73382, "dec": 8.39662, "fov": 0.2, "mjd": 61045.832,
     "note": "A bright main-belt asteroid crosses this field in about 10 hours. Press play on the Jan 2026 visit."

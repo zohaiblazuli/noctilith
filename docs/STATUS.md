@@ -11,10 +11,11 @@ All plan tasks built, reviewed and merged into `main`. Public repo: https://gith
 - Data release fix (2026-11-14): IRSA retired `spherex_qr2`; now searches `spherex_dr1` (Jul 2025–Jan 2026) + `spherex_qr3` (Jul 2026). Demo spot 1 shows 321 frames over 5 visits. DR1 compresses FLAGS; slicer now decompresses it (fixed random red speckle). Flagged pixels now drawn with real values, gentler asinh stretch (M31 core no longer clips).
 - Wide view (2026-11-14): Go opens a whole SPHEREx frame north-up (`server/overview.py`, `web/wide.js`); zoom keeps full quality; "Play this area over time" loads the yellow box as the flipbook. First build ~18 s, then cached in `cache/overview/`.
 - Research pass (2026-11-14): ghost/streak/bloom/snowball/halo pixels now bad for analysis; "One image per visit" stacking (WiseView-style); deep-survey collections added, sampled to `frame_budget` 720 (120 days); frame lists reused 12 h (`sia_ttl_hours`). New demo spot: NEP deep field.
+- Wide view plays over time (2026-11-14): ▶ animates ~1° around screen centre, one frame per visit on the wide grid (`server/visits.py`); ~30 s for M31's 34 visits. Play tab renamed Detail. Andromeda demo spot opens the wide view.
 - Overlays: rings only drawn on real pixels; max 150 brightest stars; "known star (Gaia)" toggle; no-data area drawn dark, not red.
 
 ## Next
-1. Re-run `python scripts/precache.py` for all 5 demo spots (incl. the new NEP deep field) (old cache was QR2 files; DR1/QR3 files are new downloads).
+1. Re-run `python scripts/precache.py` for the 5 flipbook demo spots, and open the Andromeda demo once (builds its wide view + visit images) (incl. the new NEP deep field) (old cache was QR2 files; DR1/QR3 files are new downloads).
 2. Check the 4 demo spots still show their asteroid on DR1 data (the `mjd` in `web/demo-spots.json` still matches DR1 dates).
 3. Optional: Aladin background (CDS is unreachable from this machine), public hosting.
 

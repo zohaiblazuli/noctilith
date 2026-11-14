@@ -389,7 +389,7 @@ document.addEventListener("keydown", (e) => {
 });
 
 // demo spots
-fetch("demo-spots.json").then((r) => r.json()).then((spots) => {
+fetch("demo-spots.json", { cache: "no-cache" }).then((r) => r.json()).then((spots) => {
   const sel = $("demo");
   spots.forEach((s, i) => sel.add(new Option(s.label, i)));
   sel.addEventListener("change", () => {
@@ -397,6 +397,7 @@ fetch("demo-spots.json").then((r) => r.json()).then((spots) => {
     if (!s) return;
     $("ra").value = s.ra; $("dec").value = s.dec; $("fov").value = String(s.fov);
     if (s.stack) { state.stack = true; $("stackVisits").checked = true; }
+    if (s.wide) { sel.value = ""; emit("onWideRequest", s.ra, s.dec); return; } // opens zoomed out
     loadTarget(s.ra, s.dec, s.fov, null, s.mjd ?? null);
     sel.value = "";
     if (s.note) $("loadStatus").dataset.note = s.note;

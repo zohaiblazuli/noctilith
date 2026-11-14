@@ -12,7 +12,8 @@ from server.config import SETTINGS
 from server.cutout import CutoutError, get_frame
 from server.grid import make_grid_wcs
 from server.known import known_sso, known_stars
-from server.overview import OverviewError, get_overview, pick_frame, png_path
+from server.overview import OverviewError, cached_info, get_overview, pick_frame, png_path
+from server.visits import VisitError, get_visit_png, pick_visit_frames, window_for
 from server.slicer import SliceError
 from server.sia import assign_bursts, cached_query_frames as query_frames, thin_frames
 
@@ -105,6 +106,53 @@ async def api_overview_png(id: str):
     path, _ = png_path(id)  # hashed name, so id can't escape the cache folder
     if not path.exists():
         raise HTTPException(404, "not built yet")
+    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "max-age=86400"})
+
+
+SIZE = Query(1.0, ge=0.1, le=1.5)
+
+
+def _wide_info(wide: str) -> dict:
+    info = cached_info(wide)
+    if info is None:
+        raise HTTPException(404, "open the wide view first")
+    return info
+
+
+@app.get("/api/visits")
+async def api_visits(wide: str, ra: float = RA, dec: float = DEC, size: float = SIZE):
+    """One frame per visit for an area of the wide view, placed on the wide view's pixel grid."""
+    info = _wide_info(wide)
+    try:
+        frames, _ = await _frames_for(ra, dec, SETTINGS.fov_default)
+    except httpx.HTTPError:
+        raise HTTPException(502, "IRSA unavailable, try again")
+    x0, y0, m = window_for(info, ra, dec, size)
+    q = f"ra={ra}&dec={dec}&size={size}&wide={wide}"
+    return {"window": {"x0": x0, "y0": y0, "m": m},
+            "visits": [{"id": f.id, "iso": f.iso, "mjd": f.mjd, "detector": f.detector,
+                        "png": f"/api/visit.png?id={f.id}&{q}"} for f in pick_visit_frames(frames, ra, dec)]}
+
+
+@app.get("/api/visit.png")
+async def api_visit_png(id: str, wide: str, ra: float = RA, dec: float = DEC, size: float = SIZE):
+    info = _wide_info(wide)
+    table = app.state.frames.get(_tkey(ra, dec))
+    if table is None:  # server restarted since the list was fetched
+        try:
+            await _frames_for(ra, dec, SETTINGS.fov_default)
+        except httpx.HTTPError:
+            raise HTTPException(502, "IRSA unavailable, try again")
+        table = app.state.frames[_tkey(ra, dec)]
+    meta = table.get(id)
+    if meta is None:
+        raise HTTPException(404, "unknown frame")
+    try:
+        path = await get_visit_png(app.state.client, meta, info, ra, dec, size, app.state.sem)
+    except VisitError:
+        raise HTTPException(404, "no coverage")
+    except (httpx.HTTPError, SliceError):
+        raise HTTPException(502, "NASA's image server is unavailable, try again")
     return FileResponse(path, media_type="image/png", headers={"Cache-Control": "max-age=86400"})
 
 

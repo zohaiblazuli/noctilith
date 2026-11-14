@@ -41,16 +41,25 @@ def pick_frame(frames, ra: float, dec: float):
 
 
 def stretch_u8(img: np.ndarray) -> np.ndarray:
-    """Same asinh curve as web/logic.js stretch() + viewer: faint sky readable, bright cores not clipped."""
+    """asinh curve: faint sky readable, bright cores not clipped.
+
+    The black level is the faintest ~2% of pixels and the noise comes from neighbour-to-neighbour
+    differences, so a window filled with smooth galaxy light (1 deg around M31's core) is scaled
+    the same way as a whole frame of mostly empty sky; otherwise the visit images played on top of
+    the wide view look like a dark square.
+    """
     good = img[np.isfinite(img)]
     if good.size == 0:
         return np.zeros(img.shape, np.uint8)
     sample = good[:: max(1, good.size // 400_000)]
-    med = float(np.median(sample))
-    mad = float(np.median(np.abs(sample - med))) or (float(sample.max() - sample.min()) / 20 or 1.0)
-    lo = med - 2 * mad
-    hi = max(med + 20 * mad, float(np.percentile(sample, 99.8)))
-    soft = 3 * mad
+    d = np.diff(img, axis=1).ravel()
+    d = d[np.isfinite(d)]
+    sigma = 1.4826 * float(np.median(np.abs(d - np.median(d)))) / np.sqrt(2) if d.size else 0.0
+    if not sigma > 0:
+        sigma = float(sample.max() - sample.min()) / 40 or 1.0
+    lo = float(np.percentile(sample, 2))
+    hi = max(lo + 20 * sigma, float(np.percentile(sample, 99.8)))
+    soft = 3 * sigma
     t = np.arcsinh(np.clip(np.nan_to_num(img, nan=lo) - lo, 0, None) / soft) / np.arcsinh((hi - lo) / soft)
     return (np.clip(t, 0, 1) * 255).astype(np.uint8)
 
@@ -109,6 +118,12 @@ async def _download_image(client: httpx.AsyncClient, access_url: str):
         raise OverviewError("short read")
     img = np.frombuffer(raw, ">f4").reshape(hdr["NAXIS2"], hdr["NAXIS1"]).astype(np.float32)
     return img, hdr
+
+
+def cached_info(frame_id: str) -> dict | None:
+    """Grid info of an already-built wide view (None if it hasn't been built)."""
+    path, k = png_path(frame_id)
+    return cache.get_json(k) if path.exists() else None
 
 
 def png_path(frame_id: str):

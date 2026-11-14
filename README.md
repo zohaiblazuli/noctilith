@@ -27,10 +27,10 @@ Type a position on the sky (Right Ascension and Declination) and this tool plays
 - [Data credits](#data-credits)
 
 ## Features
-- **Wide view**: entering a position first shows one whole SPHEREx image (~3.5° across), north-up. Scroll to zoom right down to single pixels without losing quality, drag to move, then press **Play this area over time** to load the yellow-boxed area from every frame.
+- **Wide view**: entering a position first shows one whole SPHEREx image (~3.5° across), north-up. Scroll to zoom right down to single pixels without losing quality, drag to move. **▶ Play over time** animates about 1° around the middle of the screen, one image per visit, in place on top of the wide image; you can keep zooming while it plays. **🔍 Detail** loads every single frame of the yellow box (the old Play mode).
 - **One image per visit** (WiseView-style): a checkbox combines each visit's frames into one sharper image (noise drops ~3-4x) and plays visits in order. Best for slow movers; single frames are best for fast asteroids.
 - **Deep survey**: SPHEREx's deep fields near the ecliptic poles (about 29,000 images at the north pole) are included, sampled evenly to 120 days so they load in minutes.
-- **Play mode**: step through every SPHEREx frame of a spot. The timeline is coloured by the infrared wavelength each frame saw and grouped into visits.
+- **Detail mode** (was Play): step through every SPHEREx frame of a spot. The timeline is coloured by the infrared wavelength each frame saw and grouped into visits.
 - **Compare mode**: before / after / difference panels. Frames are paired at the same wavelength, so differences are real changes rather than colour effects. Red means brighter now; blue means brighter before.
 - **"Is it known?" overlays**:
   - Orange rings: catalogued asteroids and comets at the exact time of each frame (IMCCE SkyBoT).
@@ -99,6 +99,8 @@ All endpoints take `ra`, `dec` (degrees) and `fov` (field of view in degrees, 0.
 | `GET /api/frame?id=…` | One reprojected frame (pixels + mask) |
 | `GET /api/overview?ra&dec` | Builds the wide view: picks the best-centred frame, returns its north-up grid info |
 | `GET /api/overview.png?id=…` | The wide-view picture itself (full resolution PNG) |
+| `GET /api/visits?ra&dec&wide&size` | One frame per visit for an area, placed on the wide view's pixel grid |
+| `GET /api/visit.png?id=…` | One visit's image of that area (PNG) |
 | `GET /api/known/sso?mjd=…` | Known asteroids and comets in view at that time (SkyBoT) |
 | `GET /api/known/stars` | Gaia stars in view |
 

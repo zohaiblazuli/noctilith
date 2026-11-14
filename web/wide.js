@@ -40,12 +40,14 @@ export function onPlayShown() {
 
 async function openWide(ra, dec) {
   const my = ++token;
+  resetAnim();
   if (!same({ ra, dec }, state.target)) { cancelLoads(); state.wideNewer = true; }
   state.wide = { ra, dec, info: null };
   syncUrl();
   wideViewer.resetView();
   wideViewer.setOverlays({});
   $("playArea").disabled = true;
+  $("wideAnim").disabled = true;
   $("frameLabel").textContent = "";
   wideViewer.setMessage("Downloading one whole SPHEREx image of this area (10–20 s the first time)…");
   try {
@@ -64,6 +66,7 @@ async function openWide(ra, dec) {
     updateBox();
     setLabel();
     $("playArea").disabled = false;
+    $("wideAnim").disabled = false;
   } catch (e) {
     if (my !== token) return;
     wideViewer.setMessage("Couldn't download the wide image. Try again in a moment.");
@@ -74,6 +77,12 @@ async function openWide(ra, dec) {
 function setLabel() {
   const i = state.wide?.info;
   if (!i || state.mode !== "wide") return;
+  const v = anim.list[anim.idx];
+  if (v && wideViewer.layer) {
+    $("frameLabel").textContent =
+      `Visit ${anim.idx + 1} of ${anim.list.length} · ${v.iso.replace("T", " ").slice(0, 16)} UTC · detector D${v.detector} · about 1° around the dashed box's centre, on top of the wide image`;
+    return;
+  }
   $("frameLabel").textContent =
     `Wide view · ${i.iso.replace("T", " ").slice(0, 16)} UTC · λ ≈ ${i.wavelength_um.toFixed(2)} µm · detector D${i.detector} · one whole SPHEREx image, about 3.5° across`;
 }
@@ -100,7 +109,7 @@ function updateBox() {
     rect: { x: p.x, y: p.y, size: p.fov / info.pixel_deg, label: `plays ${p.fov}°` },
     marker: { x: tx, y: ty },
   });
-  $("playArea").textContent = `▶ Play this area over time (${p.fov}°)`;
+  $("playArea").textContent = `🔍 Detail: every frame in the yellow box (${p.fov}°)`;
 }
 wideViewer.onViewChange(updateBox);
 
@@ -117,3 +126,117 @@ function playArea() {
   if (!loaded) loadTarget(p.ra, p.dec, p.fov);
 }
 $("playArea").addEventListener("click", playArea);
+
+// ---------- play over time in the wide view: one image per visit, ~1° around the screen centre ----------
+const ANIM_SIZE_DEG = 1.0;
+const ANIM_CONCURRENCY = 6;
+const anim = { list: [], imgs: new Map(), idx: -1, timer: null, token: 0, win: null, center: null, failed: 0 };
+
+function resetAnim() {
+  stopWideAnim();
+  anim.token++;
+  Object.assign(anim, { list: [], idx: -1, win: null, center: null, failed: 0 });
+  anim.imgs.clear();
+  wideViewer.setLayer(null);
+  $("wideAnimStatus").textContent = "";
+  $("widePrev").disabled = $("wideNext").disabled = true;
+}
+
+export function stopWideAnim() {
+  clearTimeout(anim.timer);
+  anim.timer = null;
+  $("wideAnim").textContent = "▶ Play over time";
+}
+
+function animStatus() {
+  const loaded = anim.imgs.size, total = anim.list.length;
+  const parts = [];
+  if (loaded < total) parts.push(`${loaded} of ${total} visits loaded`);
+  if (anim.failed) parts.push(`${anim.failed} unavailable`);
+  $("wideAnimStatus").textContent = parts.join(" · ");
+}
+
+function showVisit(i) {
+  const v = anim.list[i];
+  const im = v && anim.imgs.get(v.id);
+  if (!im) return;
+  anim.idx = i;
+  wideViewer.setLayer(im, anim.win);
+  setLabel();
+}
+
+// next loaded visit after the current one (dir = +1 / -1), wrapping around
+function stepVisit(dir) {
+  const n = anim.list.length;
+  for (let k = 1; k <= n; k++) {
+    const i = (((anim.idx + dir * k) % n) + n) % n;
+    if (anim.imgs.has(anim.list[i].id)) { showVisit(i); return; }
+  }
+}
+
+async function loadAnim(center) {
+  const info = state.wide.info;
+  const my = ++anim.token;
+  anim.imgs.clear(); anim.failed = 0; anim.idx = -1;
+  wideViewer.setLayer(null);
+  $("wideAnimStatus").textContent = "Finding SPHEREx visits of this area…";
+  const r = await fetch(`/api/visits?ra=${center.ra}&dec=${center.dec}&size=${ANIM_SIZE_DEG}&wide=${encodeURIComponent(info.id)}`);
+  if (my !== anim.token) return false;
+  if (!r.ok) { $("wideAnimStatus").textContent = "Couldn't list the visits. Try again in a moment."; return false; }
+  const d = await r.json();
+  Object.assign(anim, { list: d.visits, win: d.window, center });
+  $("widePrev").disabled = $("wideNext").disabled = false;
+  animStatus();
+  let next = 0;
+  const worker = async () => {
+    while (next < anim.list.length && my === anim.token) {
+      const i = next++, v = anim.list[i];
+      try {
+        const im = new Image();
+        im.src = v.png;
+        await im.decode();
+        if (my !== anim.token) return;
+        anim.imgs.set(v.id, im);
+        if (anim.idx < 0) showVisit(i);
+      } catch {
+        if (my === anim.token) anim.failed++;
+      }
+      if (my === anim.token) animStatus();
+    }
+  };
+  for (let k = 0; k < ANIM_CONCURRENCY; k++) worker();
+  return true;
+}
+
+// area to animate: the middle of the screen (or the target before any zooming)
+function animCenter() {
+  const p = playRegion();
+  return p && { ra: p.ra, dec: p.dec };
+}
+
+async function toggleAnim() {
+  if (anim.timer) { stopWideAnim(); return; }
+  if (anim.busy) return; // still finding visits: ignore double clicks
+  const c = animCenter();
+  if (!c) return;
+  const info = state.wide.info;
+  const moved = !anim.center || Math.hypot(...(() => {
+    const [ax, ay] = skyToGrid(info, anim.center.ra, anim.center.dec), [bx, by] = skyToGrid(info, c.ra, c.dec);
+    return [ax - bx, ay - by];
+  })()) > (ANIM_SIZE_DEG / info.pixel_deg) * 0.25;
+  if (moved) {
+    anim.busy = true;
+    const ok = await loadAnim(c).catch(() => false);
+    anim.busy = false;
+    if (!ok) { $("wideAnimStatus").textContent ||= "Couldn't load the visits. Try again."; return; }
+  }
+  $("wideAnim").textContent = "⏸ Pause";
+  const tick = () => {
+    if (anim.imgs.size > 1 || anim.idx < 0) stepVisit(1);
+    anim.timer = setTimeout(tick, 1000 / Math.max(1, +$("speed").value || 3));
+  };
+  anim.timer = setTimeout(tick, 300);
+}
+$("wideAnim").addEventListener("click", toggleAnim);
+$("widePrev").addEventListener("click", () => { stopWideAnim(); stepVisit(-1); });
+$("wideNext").addEventListener("click", () => { stopWideAnim(); stepVisit(1); });

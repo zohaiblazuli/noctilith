@@ -45,7 +45,7 @@
       <div class="modebar">
         <div class="seg" role="tablist" aria-label="View mode">
           <button type="button" data-mode="wide" title="The whole SPHEREx image around this spot. Scroll to zoom, drag to move.">Wide view</button>
-          <button type="button" data-mode="play" class="on">Play</button>
+          <button type="button" data-mode="play" class="on" title="Every single frame of a small area, as a flipbook">Detail</button>
           <button type="button" data-mode="compare">Compare</button>
         </div>
         <div id="frameLabel" class="frame-label">Enter a position or pick a demo spot to begin.</div>
@@ -54,9 +54,13 @@
       <div id="wideView" class="view-wide" hidden>
         <canvas id="wideCanvas" class="viewer"></canvas>
         <div class="wide-bar">
-          <button type="button" id="playArea" class="primary" disabled>▶ Play this area over time</button>
-          <span id="wideHint" class="wide-hint">Scroll to zoom in, drag to move. The yellow box is what will play.</span>
+          <button type="button" id="wideAnim" class="primary" disabled title="Play about 1° of sky around what you're looking at, one image per visit. Keep zooming while it plays.">▶ Play over time</button>
+          <button type="button" id="widePrev" title="Previous visit" disabled>⏮</button>
+          <button type="button" id="wideNext" title="Next visit" disabled>⏭</button>
+          <span id="wideAnimStatus" class="wide-hint"></span>
+          <button type="button" id="playArea" disabled title="Every single frame of the yellow box, with Compare, flags and spectra. Best for fast asteroids.">🔍 Detail: every frame in the yellow box</button>
         </div>
+        <p id="wideHint" class="wide-hint">Scroll to zoom, drag to move. ▶ plays about 1° around the middle of the screen, one image per visit.</p>
       </div>
 
       <div id="playView" class="view-play">
